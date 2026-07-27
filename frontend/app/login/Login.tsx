@@ -1,15 +1,15 @@
 import type { MetaFunction, LoaderFunctionArgs } from "react-router";
-import { redirect } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import { useSearchParams } from "react-router";
 import { getUser, getBackendUrl } from "~/lib/auth.server";
 
 export const meta: MetaFunction = () => [{ title: "Log in · Notes" }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  // Already logged in? Skip the login page entirely.
   const user = await getUser(request);
   if (user) return redirect("/home");
-  return null;
+
+  return { backendUrl: getBackendUrl() };
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -18,9 +18,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function LoginPage() {
+  const { backendUrl } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const error = searchParams.get("error");
-  const backendUrl = getBackendUrl();
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0a] px-6">
