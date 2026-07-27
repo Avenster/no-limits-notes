@@ -1,51 +1,55 @@
 const passport = require("passport");
-
-// Temporarily disabled Google OAuth
-// const GoogleStrategy = require("passport-google-oauth20").Strategy;
-
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const GitHubStrategy = require("passport-github2").Strategy;
 
-const {
-  upsertUser,
-  findUserById,
-} = require("./services/userStore");
+const userStore = require("./services/userStore");
 
 // ============================================================
-// Session Serialization
+// Session serialization
+// We only store the user id in the session cookie; full profile is
+// looked up from Postgres on each request.
 // ============================================================
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
 
-passport.deserializeUser((id, done) => {
-  const user = findUserById(id);
-  done(null, user);
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await userStore.findUserById(id);
+    done(null, user);
+  } catch (err) {
+    done(err);
+  }
 });
 
 // ============================================================
-// Google OAuth
-// Temporarily disabled
+// Google strategy
+// Temporarily disabled to match routes/auth.js
 // ============================================================
 
-/*
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/auth/google/callback",
-    },
-    (accessToken, refreshToken, profile, done) => {
-      const user = upsertUser(profile, "google");
-      done(null, user);
-    }
-  )
-);
-*/
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "/auth/google/callback",
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          const user = await userStore.upsertUser(profile, "google");
+          done(null, user);
+        } catch (err) {
+          done(err);
+        }
+      }
+    )
+  );
+}
 
 // ============================================================
-// GitHub OAuth
+// GitHub strategy
 // ============================================================
 
 passport.use(
@@ -55,9 +59,13 @@ passport.use(
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
       callbackURL: "/auth/github/callback",
     },
-    (accessToken, refreshToken, profile, done) => {
-      const user = upsertUser(profile, "github");
-      done(null, user);
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const user = await userStore.upsertUser(profile, "github");
+        done(null, user);
+      } catch (err) {
+        done(err);
+      }
     }
   )
 );

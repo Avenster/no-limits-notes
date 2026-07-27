@@ -13,3 +13,202 @@ body {
     color-scheme: dark;
   }
 }
+
+/* ============================================================
+   Sidebar
+   ============================================================ */
+
+.note-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  min-width: 260px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(24px);
+  transition: margin-left 0.2s ease, opacity 0.2s ease;
+}
+
+.note-sidebar--open {
+  margin-left: 0;
+  opacity: 1;
+}
+
+.note-sidebar--closed {
+  margin-left: -260px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+/* ============================================================
+   Editor wrapper — wider and with accent border
+   ============================================================ */
+
+.note-editor-wrapper {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px;
+  min-height: 400px;
+}
+
+.note-editor-wrapper:focus-within {
+  border-color: rgba(139, 92, 246, 0.25);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.1), 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   BlockNote overrides — dark theme polish
+   ============================================================ */
+
+/* Force dark background on the editor root */
+.bn-editor {
+  background: transparent !important;
+  color: #e8e8e8 !important;
+}
+
+/* Code blocks */
+.bn-editor [data-content-type="codeBlock"] {
+  margin: 8px 0;
+}
+
+.bn-editor pre {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  padding: 16px 20px !important;
+  overflow-x: auto;
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", "Cascadia Code", "Consolas", monospace !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  tab-size: 2;
+}
+
+.bn-editor pre code {
+  background: none !important;
+  padding: 0 !important;
+  border: none !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  color: #c9d1d9 !important;
+}
+
+/* Inline code */
+.bn-editor :not(pre) > code {
+  background: rgba(139, 92, 246, 0.12) !important;
+  color: #c4b5fd !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", monospace !important;
+  font-size: 0.875em !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+}
+
+/* ============================================================
+   Table overrides
+   ============================================================ */
+
+.bn-editor table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 8px 0 !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bn-editor th,
+.bn-editor td {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 10px 14px !important;
+  text-align: left !important;
+  font-size: 14px !important;
+}
+
+.bn-editor th {
+  background: rgba(255, 255, 255, 0.06) !important;
+  font-weight: 600 !important;
+  color: #e8e8e8 !important;
+}
+
+.bn-editor td {
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.bn-editor tr:hover td {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* ============================================================
+   BlockNote menu/dropdown overrides for dark
+   ============================================================ */
+
+.bn-editor .bn-side-menu,
+.bn-editor .bn-formatting-toolbar,
+.bn-editor .bn-slash-menu,
+.bn-editor .bn-link-toolbar {
+  background: #1a1a1a !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Headings */
+.bn-editor h1 {
+  font-size: 1.875rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  color: #f0f0f0 !important;
+}
+
+.bn-editor h2 {
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  color: #e8e8e8 !important;
+}
+
+.bn-editor h3 {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  color: #e0e0e0 !important;
+}
+
+/* Blockquote */
+.bn-editor blockquote {
+  border-left: 3px solid rgba(139, 92, 246, 0.4) !important;
+  padding-left: 16px !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  margin: 8px 0 !important;
+}
+
+/* Links */
+.bn-editor a {
+  color: #8b5cf6 !important;
+  text-decoration: underline !important;
+  text-decoration-color: rgba(139, 92, 246, 0.3) !important;
+  text-underline-offset: 3px !important;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.bn-editor a:hover {
+  text-decoration-color: rgba(139, 92, 246, 0.8) !important;
+}
+
+/* List markers */
+.bn-editor ul {
+  list-style-type: disc !important;
+}
+
+.bn-editor ol {
+  list-style-type: decimal !important;
+}
+
+/* Placeholder text */
+.bn-editor [data-placeholder]::before {
+  color: rgba(255, 255, 255, 0.2) !important;
+}

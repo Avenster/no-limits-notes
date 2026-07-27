@@ -1,14 +1,13 @@
-// In-memory user "store"
-// This is a placeholder until Prisma + Postgres is wired in.
+// User store backed by Postgres via Prisma.
+// Same function names as the old in-memory version so passport.js
+// doesn't need to change.
 
-const usersById = new Map();
+const prisma = require("../prisma");
 
-function upsertUser(profile, provider) {
+async function upsertUser(profile, provider) {
   const providerId = profile.id;
-  const id = `${provider}:${providerId}`;
 
-  const user = {
-    id,
+  const data = {
     provider,
     providerId,
     name: profile.displayName || profile.username || "Unknown",
@@ -16,13 +15,23 @@ function upsertUser(profile, provider) {
     avatarUrl: profile.photos?.[0]?.value || null,
   };
 
-  usersById.set(id, user);
+  const user = await prisma.user.upsert({
+    where: {
+      provider_providerId: {
+        provider,
+        providerId,
+      },
+    },
+    update: data,
+    create: data,
+  });
 
   return user;
 }
 
-function findUserById(id) {
-  return usersById.get(id) || null;
+async function findUserById(id) {
+  if (!id) return null;
+  return prisma.user.findUnique({ where: { id } });
 }
 
 module.exports = {

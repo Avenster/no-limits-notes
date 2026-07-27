@@ -1,6 +1,7 @@
 import type { Route } from "./+types/home";
 // import Logi  from "../welcome/welcome";
 import HomePage from "../component/index";
+export { loader } from "../component/index";
 
 export function meta({}: Route.MetaArgs) {
   return [

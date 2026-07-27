@@ -79,7 +79,7 @@ router.get(
     session: true,
   }),
   (req, res) => {
-    res.redirect(`${FRONTEND_URL}/`);
+    res.redirect(`${FRONTEND_URL}/home`);
   }
 );
 
