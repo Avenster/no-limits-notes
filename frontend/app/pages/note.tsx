@@ -15,13 +15,15 @@ import {
 import type { Block } from "@blocknote/core";
 import {
   ArrowLeft,
-  ChevronsLeft,
-  ChevronsRight,
   Copy,
   Download,
+  FileText,
   History,
   PanelLeft,
+  PanelLeftClose,
   Pencil,
+  Plus,
+  Search,
   Settings,
   Share2,
   Star,
@@ -396,31 +398,66 @@ export default function NotePage() {
 
   return (
     <main className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary, #0a0a0a)', color: 'var(--text-primary, #e8e8e8)' }}>
-      {/* Scoped accent-driven interaction styles — reads var(--accent) so it
+      {/* Scoped accent-driven interaction styles — reads rgb(var(--accent) so it
           adapts to whichever accent color is active, no matter what it is. */}
       <style>{`
         .glass-btn:hover {
-          border-color: color-mix(in srgb, var(--accent, #c9a24b) 45%, transparent) !important;
-          box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #c9a24b) 18%, transparent),
-                      0 10px 24px -14px color-mix(in srgb, var(--accent, #c9a24b) 65%, transparent);
+          border-color: color-mix(in srgb, rgb(var(--accent)) 45%, transparent) !important;
+          box-shadow: 0 0 0 1px color-mix(in srgb, rgb(var(--accent)) 18%, transparent),
+                      0 10px 24px -14px color-mix(in srgb, rgb(var(--accent)) 65%, transparent);
         }
         .glass-btn-primary {
           background: linear-gradient(135deg,
-            color-mix(in srgb, var(--accent, #c9a24b) 92%, white 8%),
-            color-mix(in srgb, var(--accent, #c9a24b) 78%, black 10%));
-          box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--accent, #c9a24b) 75%, transparent);
+            color-mix(in srgb, rgb(var(--accent)) 92%, white 8%),
+            color-mix(in srgb, rgb(var(--accent)) 78%, black 10%));
+          box-shadow: 0 8px 20px -10px color-mix(in srgb, rgb(var(--accent)) 75%, transparent);
+          color: #fff;
         }
         .glass-btn-primary:hover {
           filter: brightness(1.08);
-          box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--accent, #c9a24b) 80%, transparent);
+          box-shadow: 0 10px 26px -10px color-mix(in srgb, rgb(var(--accent)) 80%, transparent);
+        }
+        .glass-btn-primary--off {
+          background: color-mix(in srgb, var(--surface-1) 45%, transparent) !important;
+          border: 1px solid var(--border) !important;
+          color: var(--text-secondary) !important;
+          text-shadow: none;
+          box-shadow: none;
+        }
+        .glass-btn-primary--off:hover {
+          background: var(--surface-2) !important;
+          color: var(--text-primary) !important;
+          border-color: color-mix(in srgb, rgb(var(--accent)) 45%, transparent) !important;
+        }
+        
+        /* Remove BlockNote default borders and focus rings */
+        .note-editor-wrapper .bn-container {
+          outline: none !important;
+        }
+        .note-editor-wrapper [contenteditable]:focus {
+          outline: none !important;
+        }
+        
+        /* Align editor text padding with the title */
+        .note-editor-wrapper .bn-editor {
+          padding-inline: 0 !important;
         }
         .note-search {
           transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
         }
-        .note-search:focus {
-          border-color: color-mix(in srgb, var(--accent, #c9a24b) 50%, transparent) !important;
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #c9a24b) 16%, transparent);
-          background: rgba(255,255,255,0.06) !important;
+        .note-search::placeholder {
+          color: var(--text-quaternary, rgba(255,255,255,0.25));
+        }
+        .note-search-wrap {
+          transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+        }
+        .note-search-wrap:hover {
+          background: color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.04)) 90%, transparent);
+        }
+        .note-search-wrap:focus-within {
+          border-color: color-mix(in srgb, rgb(var(--accent, 201 162 75)) 45%, transparent) !important;
+          box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 10%, transparent);
+          background: color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.04)) 85%, transparent) !important;
         }
         .note-active-row { position: relative; }
         .note-active-row::before {
@@ -432,13 +469,19 @@ export default function NotePage() {
           width: 2px;
           border-radius: 2px;
           background: linear-gradient(180deg,
-            color-mix(in srgb, var(--accent, #c9a24b) 90%, white 10%),
-            color-mix(in srgb, var(--accent, #c9a24b) 55%, transparent));
+            color-mix(in srgb, rgb(var(--accent, 201 162 75)) 90%, white 10%),
+            color-mix(in srgb, rgb(var(--accent, 201 162 75)) 55%, transparent);
         }
         .note-title-rule { transition: opacity 250ms ease; }
         .note-title-wrap:focus-within .note-title-rule { opacity: 1; }
         .profile-card:hover {
           background: rgba(255,255,255,0.05) !important;
+        }
+        .group-name-pill {
+          transition: background 150ms ease;
+        }
+        .group-name-pill:hover {
+          background: rgba(255,255,255,0.04);
         }
       `}</style>
 
@@ -447,25 +490,25 @@ export default function NotePage() {
           sidebarOpen ? "note-sidebar--open" : "note-sidebar--closed"
         }`}
         style={{
-          background: 'var(--bg-secondary, transparent)',
-          borderColor: 'var(--border, rgba(255,255,255,0.08))',
+          background: 'var(--bg-primary, #0a0a0a)',
+          borderColor: 'transparent',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
         }}
       >
-        <div aria-hidden className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent, #c9a24b) 45%, transparent), transparent)' }} />
+        <div aria-hidden className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 45%, transparent), transparent)' }} />
 
         {/* Flat strip that visually continues into the main header — same
             height/border as the main content header so the two form one
             unbroken bar across the top of the app. */}
-        <div className="flex h-[57px] items-center justify-between px-4" style={{ borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))' }}>
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex mt-2 h-[52px] items-center justify-between px-4" >
+          <div className="group-name-pill flex items-center gap-2.5 min-w-0 rounded-xl px-2 py-1.5 -mx-2">
             <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold tracking-wide"
               style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent, #c9a24b) 30%, transparent), color-mix(in srgb, var(--accent, #c9a24b) 10%, transparent))',
-                borderColor: 'color-mix(in srgb, var(--accent, #c9a24b) 40%, transparent)',
-                color: 'var(--accent, #c9a24b)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 90%, white 10%), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 70%, black 15%)',
+                color: '#fff',
+                boxShadow: '0 2px 8px -2px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 60%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)',
               }}
             >
               {groupInfo?.name?.slice(0, 1).toUpperCase() || "G"}
@@ -477,22 +520,45 @@ export default function NotePage() {
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-white/[0.06] transition-colors"
+            title="Collapse sidebar"
+            className="flex h-6 w-6 items-center justify-center rounded-md transition-colors"
             style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2, rgba(255,255,255,0.06))'; e.currentTarget.style.color = 'var(--text-primary, #e8e8e8)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-tertiary, rgba(255,255,255,0.4))'; }}
           >
-            <ChevronsLeft size={14} strokeWidth={2} />
+            <PanelLeftClose size={14} strokeWidth={2} />
           </button>
         </div>
 
-        <div className="px-3 py-3">
-          <input 
-            type="text" 
-            placeholder="Search pages..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="note-search w-full bg-white/[0.05] border border-transparent rounded-lg px-3 py-1.5 text-sm outline-none placeholder:text-white/30"
-            style={{ color: 'var(--text-primary, #e8e8e8)' }}
-          />
+        <div className="px-3 py-2">
+          <div
+            className="note-search-wrap flex items-center gap-2 rounded-xl px-2.5 py-1.5"
+            style={{
+              background: 'color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.04)) 70%, transparent)',
+              border: '1px solid var(--border, rgba(255,255,255,0.08))',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 3px rgba(0,0,0,0.06)',
+            }}
+          >
+            <Search size={13} strokeWidth={2} style={{ color: 'var(--text-quaternary, rgba(255,255,255,0.25))', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search pages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="note-search w-full bg-transparent text-sm outline-none"
+              style={{ color: 'var(--text-primary, #e8e8e8)' }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors"
+                style={{ background: 'var(--surface-3, rgba(255,255,255,0.1))', color: 'var(--text-tertiary)' }}
+              >
+                <X size={10} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="px-3 pb-3">
@@ -506,13 +572,11 @@ export default function NotePage() {
             <span
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
               style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent, #c9a24b) 90%, white 10%), color-mix(in srgb, var(--accent, #c9a24b) 65%, black 15%))',
-                boxShadow: '0 2px 8px -2px color-mix(in srgb, var(--accent, #c9a24b) 70%, transparent)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 90%, white 10%), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 65%, black 15%)',
+                boxShadow: '0 2px 8px -2px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 70%, transparent)',
               }}
             >
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-                <path d="M8 3v10M3 8h10" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
+              <Plus size={10} strokeWidth={2.2} color="white" />
             </span>
             {newPageFetcher.state === "submitting" ? "Creating…" : "New page"}
           </button>
@@ -548,10 +612,12 @@ export default function NotePage() {
                         }`}
                         style={{ color: p.id === page.id ? 'var(--text-primary, #e8e8e8)' : 'var(--text-secondary, rgba(255,255,255,0.5))' }}
                       >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0">
-                          <path d="M4 2h5l3 3v9H4V2z" stroke="currentColor" strokeOpacity={p.id === page.id ? 0.9 : 0.5} strokeWidth="1.3" strokeLinejoin="round" />
-                          <path d="M9 2v3h3" stroke="currentColor" strokeOpacity={p.id === page.id ? 0.9 : 0.5} strokeWidth="1.3" strokeLinejoin="round" />
-                        </svg>
+                        <FileText
+                          size={14}
+                          strokeWidth={1.6}
+                          className="shrink-0"
+                          style={{ opacity: p.id === page.id ? 0.9 : 0.5 }}
+                        />
                         <span className="truncate">{p.title || "Untitled"}</span>
                       </Link>
                     )}
@@ -588,10 +654,12 @@ export default function NotePage() {
                     }`}
                     style={{ color: p.id === page.id ? 'var(--text-primary, #e8e8e8)' : 'var(--text-secondary, rgba(255,255,255,0.5))' }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0">
-                      <path d="M4 2h5l3 3v9H4V2z" stroke="currentColor" strokeOpacity={p.id === page.id ? 0.9 : 0.5} strokeWidth="1.3" strokeLinejoin="round" />
-                      <path d="M9 2v3h3" stroke="currentColor" strokeOpacity={p.id === page.id ? 0.9 : 0.5} strokeWidth="1.3" strokeLinejoin="round" />
-                    </svg>
+                    <FileText
+                      size={14}
+                      strokeWidth={1.6}
+                      className="shrink-0"
+                      style={{ opacity: p.id === page.id ? 0.9 : 0.5 }}
+                    />
                     <span className="truncate">{p.title || "Untitled"}</span>
                   </Link>
                 )}
@@ -620,7 +688,7 @@ export default function NotePage() {
                     ) : (
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
-                        style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent, #c9a24b) 35%, rgba(255,255,255,0.08)), color-mix(in srgb, var(--accent, #c9a24b) 8%, transparent))' }}
+                        style={{ background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 35%, rgba(255,255,255,0.08)), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 8%, transparent)' }}
                       >
                         {m.name.charAt(0).toUpperCase()}
                       </div>
@@ -629,7 +697,7 @@ export default function NotePage() {
                     {m.isGuest && (
                       <span
                         className="ml-auto text-[9px] px-1 rounded"
-                        style={{ background: 'color-mix(in srgb, var(--accent, #c9a24b) 18%, transparent)', color: 'var(--text-secondary, rgba(255,255,255,0.6))' }}
+                        style={{ background: 'color-mix(in srgb, rgb(var(--accent, 201 162 75)) 18%, transparent)', color: 'var(--text-secondary, rgba(255,255,255,0.6))' }}
                       >
                         Guest
                       </span>
@@ -641,7 +709,7 @@ export default function NotePage() {
           </div>
         </div>
 
-        <div className="border-t px-3 py-3" style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))' }}>
+        {/* <div className=" px-3 py-3" style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))' }}>
           <Link
             to="/home"
             className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs hover:bg-white/[0.06] transition-colors"
@@ -650,11 +718,11 @@ export default function NotePage() {
             <ArrowLeft size={14} strokeWidth={2} />
             All groups
           </Link>
-        </div>
+        </div> */}
 
         {/* Bottom-left profile / settings card — avatar, name, gear icon.
             Opens a small popover with account-level actions. */}
-        <div className="relative border-t px-3 py-3" style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))' }} ref={profileMenuRef}>
+        <div className="relative  px-3 py-3" style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))' }} ref={profileMenuRef}>
           <button
             type="button"
             onClick={(e) => {
@@ -669,8 +737,8 @@ export default function NotePage() {
               <div
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 style={{
-                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent, #c9a24b) 40%, rgba(255,255,255,0.08)), color-mix(in srgb, var(--accent, #c9a24b) 10%, transparent))',
-                  color: 'var(--accent, #c9a24b)',
+                  background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 40%, rgba(255,255,255,0.08)), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 10%, transparent)',
+                  color: 'rgb(var(--accent, 201 162 75))',
                 }}
               >
                 {(user?.name || "Guest").charAt(0).toUpperCase()}
@@ -731,15 +799,23 @@ export default function NotePage() {
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      {/* Main content — floating card with rounded corners */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden p-2 pl-0 mx-2">
+        <div
+          className="flex-1 flex flex-col min-w-0 overflow-hidden rounded-2xl"
+          style={{
+            background: 'var(--surface-1, #141414)',
+            border: '1px solid var(--border, rgba(255,255,255,0.08))',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03)',
+          }}
+        >
         {/* Flat header, no floating pill container — seamlessly continues
             the sidebar's top strip so the two form a single bar. Sits
             outside the scrollable region below so it stays fixed in place
             while the editor content scrolls underneath it. */}
         <header
-          className="flex h-[57px] shrink-0 items-center justify-between px-6"
-          style={{ borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))' }}
+          className="flex h-[52px] shrink-0 items-center justify-between px-6 rounded-t-2xl"
+          style={{ borderBottom: '1px solid var(--border, rgba(255,255,255,0.06))' }}
         >
           <div className="flex items-center gap-4">
             {!sidebarOpen && (
@@ -757,7 +833,7 @@ export default function NotePage() {
               </button>
             )}
             <Link
-              to={`/group/${groupId}/pages`}
+              to={`/home`}
               className="flex items-center gap-2 text-xs transition-colors duration-150 hover:opacity-80"
               style={{ color: 'var(--text-secondary)' }}
             >
@@ -769,7 +845,7 @@ export default function NotePage() {
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-quaternary)' }}>
               {saveFetcher.state === "submitting" && (
-                <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent, #c9a24b)' }} />
+                <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: 'rgb(var(--accent, 201 162 75))' }} />
               )}
               {savingLabel}
             </span>
@@ -784,16 +860,19 @@ export default function NotePage() {
 
             <ThemeToggle />
 
-            {/* Share stays last, as the primary/emphasized action */}
-            <HeaderButton variant="primary" onClick={() => setShareOpen(true)}>
-              <Share2 size={14} strokeWidth={2} /> Share
+            {/* Share stays last, as the primary/emphasized action.
+                Filled accent when the page is public, accent-outlined
+                "off" look when it isn't — mirrors the toggle inside
+                the share panel. */}
+            <HeaderButton variant="primary" active={sharePage.isPublic} onClick={() => setShareOpen(true)}>
+              <Share2 size={14} strokeWidth={2} /> {sharePage.isPublic ? "Shared" : "Share"}
             </HeaderButton>
           </div>
         </header>
 
         {/* Only this region scrolls — header above stays fixed in place. */}
         <div className="flex-1 overflow-y-auto">
-          <section className="relative mx-auto w-full max-w-5xl px-8 py-10">
+          <section className="relative mx-auto w-full max-w-5xl py-10">
             <div className="note-title-wrap relative mb-2">
               <input
                 value={title}
@@ -806,7 +885,7 @@ export default function NotePage() {
               <span
                 aria-hidden
                 className="note-title-rule pointer-events-none absolute -bottom-1 left-0 h-[2px] w-28 opacity-30"
-                style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--accent, #c9a24b) 85%, white 10%), transparent)' }}
+                style={{ background: 'linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 85%, white 10%), transparent)' }}
               />
             </div>
             <p className="mb-8 text-xs" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.3))' }}>
@@ -818,9 +897,9 @@ export default function NotePage() {
               className="note-editor-wrapper"
               style={{
                 borderRadius: 20,
-                border: '1px solid var(--border, rgba(255,255,255,0.07))',
-                background: 'color-mix(in srgb, var(--surface-1, #121212) 30%, transparent)',
-                padding: 6,
+                // border: '1px solid var(--border, rgba(255,255,255,0.07))',
+                background: 'transparent',
+                // padding: 6,
               }}
             >
               {mounted ? (
@@ -834,6 +913,7 @@ export default function NotePage() {
               )}
             </div>
           </section>
+        </div>
         </div>
       </div>
       
@@ -902,7 +982,7 @@ export default function NotePage() {
               transition: background 120ms ease, color 120ms ease;
             }
             .context-menu-item:hover {
-              background: color-mix(in srgb, var(--accent, #c9a24b) 14%, transparent);
+              background: color-mix(in srgb, rgb(var(--accent, 201 162 75)) 14%, transparent);
               color: var(--text-primary, #e8e8e8);
             }
             .context-menu-item.danger {
@@ -913,7 +993,7 @@ export default function NotePage() {
               color: #fca5a5;
             }
           `}</style>
-          <div aria-hidden className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent, #c9a24b) 55%, transparent), transparent)' }} />
+          <div aria-hidden className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 55%, transparent), transparent)' }} />
           <button 
             className="context-menu-item mt-1"
             onClick={() => {
@@ -975,11 +1055,13 @@ function HeaderButton({
   onClick,
   variant = "outline",
   disabled,
+  active,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   variant?: "outline" | "primary";
   disabled?: boolean;
+  active?: boolean;
 }) {
   if (variant === "primary") {
     return (
@@ -987,7 +1069,7 @@ function HeaderButton({
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className="glass-btn-primary inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold text-white transition-all duration-150 active:scale-[0.97] disabled:opacity-50"
+        className={`glass-btn-primary${active === false ? " glass-btn-primary--off" : ""} inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.97] disabled:opacity-50`}
       >
         {children}
       </button>
@@ -1029,7 +1111,7 @@ function EditorSkeleton() {
           background: linear-gradient(
             90deg,
             color-mix(in srgb, var(--surface-2, #1a1a1a) 100%, transparent) 25%,
-            color-mix(in srgb, var(--accent, #c9a24b) 12%, var(--surface-2, #1a1a1a)) 50%,
+            color-mix(in srgb, rgb(var(--accent, 201 162 75)) 12%, var(--surface-2, #1a1a1a) 50%,
             color-mix(in srgb, var(--surface-2, #1a1a1a) 100%, transparent) 75%
           );
           background-size: 200% 100%;
@@ -1106,7 +1188,7 @@ function HistoryPanel({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-60"
-          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, var(--accent, #c9a24b) 20%, transparent), transparent 70%)' }}
+          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 20%, transparent), transparent 70%)' }}
         />
         <div className="relative">
           <div className="mb-4 flex items-center justify-between">
@@ -1146,7 +1228,7 @@ function HistoryPanel({
                   <button
                     type="button"
                     onClick={() => onRestore(rev.id)}
-                    className="glass-btn-primary rounded-lg px-2.5 py-1 text-xs font-semibold text-white transition-all duration-150 active:scale-[0.96]"
+                    className="glass-btn-primary rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 active:scale-[0.96]"
                   >
                     Restore
                   </button>
@@ -1181,15 +1263,16 @@ function SharePanel({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-6"
+      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-6"
+      style={{ background: 'var(--glow-bg, rgba(0,0,0,0.2))' }}
       onClick={onClose}
     >
       <div
         className="relative w-full max-w-md overflow-hidden rounded-2xl border p-6 backdrop-blur-xl transition-all duration-200 ease-out"
         style={{
-          boxShadow: "0 24px 48px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05)",
-          background: 'color-mix(in srgb, var(--surface-1, #121212) 90%, transparent)',
-          borderColor: 'var(--border, rgba(255,255,255,0.08))',
+          boxShadow: 'var(--shadow-modal)',
+          background: 'var(--bg-secondary)',
+          borderColor: 'var(--border)',
           opacity: entered ? 1 : 0,
           transform: entered ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(8px)',
         }}
@@ -1198,16 +1281,16 @@ function SharePanel({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-60"
-          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, var(--accent, #c9a24b) 20%, transparent), transparent 70%)' }}
+          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 20%, transparent), transparent 70%)' }}
         />
         <div className="relative">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary, #e8e8e8)' }}>Share page</h2>
+            <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Share page</h2>
             <button
               type="button"
               onClick={onClose}
-              className="text-xs hover:text-white/70"
-              style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }}
+              className="text-xs transition-colors hover:opacity-70"
+              style={{ color: 'var(--text-tertiary)' }}
             >
               <X size={14} strokeWidth={2} />
             </button>
@@ -1215,11 +1298,11 @@ function SharePanel({
 
           <div
             className="flex items-center justify-between rounded-xl border px-4 py-3"
-            style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))', background: 'var(--surface-2, rgba(255,255,255,0.03))' }}
+            style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
           >
             <div>
-              <p className="text-sm" style={{ color: 'var(--text-primary, #e8e8e8)' }}>Public link</p>
-              <p className="text-xs" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.3))' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Public link</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
                 Anyone with the link can view — no account or code needed.
               </p>
             </div>
@@ -1232,13 +1315,13 @@ function SharePanel({
               className="relative h-6 w-11 shrink-0 rounded-full border transition-all duration-150 disabled:opacity-50"
               style={{
                 background: isPublic
-                  ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent, #c9a24b) 92%, white 8%), color-mix(in srgb, var(--accent, #c9a24b) 75%, black 12%))'
-                  : 'var(--surface-3, rgba(255,255,255,0.1))',
+                  ? 'rgb(var(--accent, 201 162 75))'
+                  : 'var(--surface-3)',
                 borderColor: isPublic
-                  ? 'color-mix(in srgb, var(--accent, #c9a24b) 70%, transparent)'
-                  : 'var(--border, rgba(255,255,255,0.14))',
+                  ? 'transparent'
+                  : 'var(--border)',
                 boxShadow: isPublic
-                  ? '0 4px 14px -4px color-mix(in srgb, var(--accent, #c9a24b) 70%, transparent)'
+                  ? '0 2px 8px -2px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 70%, transparent)'
                   : 'none',
               }}
             >
@@ -1258,16 +1341,16 @@ function SharePanel({
           {isPublic && publicUrl && (
             <div
               className="mt-3 flex items-center gap-2 rounded-xl border px-3.5 py-2.5"
-              style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))', borderStyle: 'dashed', background: 'var(--surface-2, rgba(255,255,255,0.03))' }}
+              style={{ borderColor: 'var(--border)', borderStyle: 'dashed', background: 'var(--surface-2)' }}
             >
-              <span className="flex-1 truncate text-xs font-mono" style={{ color: 'var(--text-secondary, rgba(255,255,255,0.6))' }}>
+              <span className="flex-1 truncate text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
                 {publicUrl}
               </span>
               <button
                 type="button"
                 onClick={onCopy}
-                className="glass-btn shrink-0 rounded-full border px-3 py-1 text-xs font-medium hover:bg-white/[0.06] transition-all duration-150"
-                style={{ color: 'var(--text-secondary, rgba(255,255,255,0.7))', borderColor: 'var(--border, rgba(255,255,255,0.08))' }}
+                className="glass-btn shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-150"
+                style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}
               >
                 {publicUrl && copyLabel === "Copied!" ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
                 {copyLabel}

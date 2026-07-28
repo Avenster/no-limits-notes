@@ -101,11 +101,11 @@ function ThemeToggleComponent() {
             transform: entered ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(-6px)',
           }}
         >
-          <div
+          {/* <div
             aria-hidden
             className="pointer-events-none absolute inset-0 opacity-60"
             style={{ background: `radial-gradient(160px 90px at 100% 0%, ${ACCENT_HEX[accent]}33, transparent 70%)` }}
-          />
+          /> */}
           <div className="relative">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.3))' }}>
               Appearance

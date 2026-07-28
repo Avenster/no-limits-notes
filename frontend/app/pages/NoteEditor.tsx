@@ -143,7 +143,7 @@ export default function NoteEditor({ initialContent, onChange, editable = true }
       {/* Absolute positioned overlay copy button */}
       {hoveredBlock && (
         <button
-          className="copy-overlay-btn absolute z-10 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-sm"
+          className= "copy-overlay-btn absolute z-10 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-sm"
           style={{ 
             top: hoveredBlock.top, 
             right: hoveredBlock.right,

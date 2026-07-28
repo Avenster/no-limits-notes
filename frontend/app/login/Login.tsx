@@ -40,11 +40,11 @@ export default function LoginPage() {
       />
 
       {/* Animated glow behind card */}
-      <div
+      {/* <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-30 blur-[100px]"
         style={{ background: "linear-gradient(135deg, rgb(var(--accent)), rgb(var(--accent-light)))" }}
-      />
+      /> */}
 
       {/* Top bar */}
       <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-6 py-6">

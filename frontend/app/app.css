@@ -123,9 +123,9 @@ body {
 
 .note-editor-wrapper {
   border-radius: 16px;
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
   background: var(--surface-1);
-  padding: 8px;
+  /* padding: 8px; */
   min-height: 400px;
 }
 
@@ -174,10 +174,7 @@ body {
 }
 
 
-.note-editor-wrapper:focus-within {
-  border-color: rgb(var(--accent) / 0.3);
-  box-shadow: 0 0 0 1px rgb(var(--accent) / 0.12), 0 8px 32px rgba(0, 0, 0, 0.2);
-}
+
 
 /* ============================================================
    BlockNote overrides
@@ -186,6 +183,7 @@ body {
 .bn-editor {
   background: transparent !important;
   color: var(--text-primary) !important;
+  padding: 0 !important;
 }
 
 /* Code blocks */
