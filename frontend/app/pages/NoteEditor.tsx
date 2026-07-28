@@ -103,9 +103,9 @@ export default function NoteEditor({ initialContent, onChange, editable = true }
         const rect = codeBlock.getBoundingClientRect();
         const containerRect = containerRef.current.getBoundingClientRect();
         
-        // Extract text
-        const textElement = codeBlock.querySelector("p");
-        const text = textElement?.textContent || "";
+        // Extract text safely using innerText to preserve newlines
+        const textElements = Array.from(codeBlock.querySelectorAll("p"));
+        const text = textElements.map(el => el.innerText || el.textContent || "").join("\n");
         
         setHoveredBlock({
           top: rect.top - containerRect.top + 8,

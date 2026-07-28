@@ -186,9 +186,28 @@ body {
   padding: 0 !important;
 }
 
-/* Code blocks */
 .bn-editor [data-content-type="codeBlock"] {
   margin: 8px 0;
+  position: relative;
+}
+
+.bn-editor [data-content-type="codeBlock"] select {
+  position: absolute;
+  top: 8px;
+  right: 44px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+.bn-editor [data-content-type="codeBlock"] select:hover {
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 1);
 }
 
 .bn-editor pre {
@@ -496,4 +515,8 @@ body {
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+
+.bn-editor {
+  max-width: 100% !important;
 }

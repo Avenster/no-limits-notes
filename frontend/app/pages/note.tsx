@@ -1349,7 +1349,7 @@ function SharePanel({
               <button
                 type="button"
                 onClick={onCopy}
-                className="glass-btn shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-150"
+                className="glass-btn shrink-0 flex items-center justify-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-150"
                 style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)' }}
               >
                 {publicUrl && copyLabel === "Copied!" ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2} />}
