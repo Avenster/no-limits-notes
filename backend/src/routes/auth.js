@@ -41,7 +41,7 @@ router.post("/logout", (req, res) => {
 // Temporarily disabled
 // ============================================================
 
-/*
+
 router.get(
   "/google",
   passport.authenticate("google", {
@@ -59,7 +59,6 @@ router.get(
     res.redirect(`${FRONTEND_URL}/`);
   }
 );
-*/
 
 router.put("/profile", async (req, res) => {
   if (!req.user) {
