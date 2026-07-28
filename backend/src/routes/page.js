@@ -163,4 +163,85 @@ router.post("/:pageId/share", async (req, res) => {
   }
 });
 
+router.delete("/:pageId", async (req, res) => {
+  try {
+    const { groupId, pageId } = req.params;
+    const membership = await requireMembership(req, groupId);
+    if (!membership.ok) {
+      return res.status(403).json({ error: "You're not a member of this group." });
+    }
+    const existing = await pageStore.getPageInGroup(groupId, pageId);
+    if (!existing) return res.status(404).json({ error: "Page not found." });
+
+    await prisma.page.delete({ where: { id: pageId } });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE page failed:", err);
+    res.status(500).json({ error: "Couldn't delete the page." });
+  }
+});
+
+router.post("/:pageId/duplicate", async (req, res) => {
+  try {
+    const { groupId, pageId } = req.params;
+    const membership = await requireMembership(req, groupId);
+    if (!membership.ok) {
+      return res.status(403).json({ error: "You're not a member of this group." });
+    }
+    const existing = await pageStore.getPageInGroup(groupId, pageId);
+    if (!existing) return res.status(404).json({ error: "Page not found." });
+
+    const newPage = await prisma.page.create({
+      data: {
+        groupId,
+        title: `${existing.title} (copy)`,
+        content: existing.content,
+        createdBy: membership.userId || null,
+        lastEditedByName: membership.displayName || existing.lastEditedByName,
+      },
+    });
+    res.json({ page: newPage });
+  } catch (err) {
+    console.error("POST duplicate failed:", err);
+    res.status(500).json({ error: "Couldn't duplicate the page." });
+  }
+});
+
+router.post("/:pageId/restore/:revisionId", async (req, res) => {
+  try {
+    const { groupId, pageId, revisionId } = req.params;
+    const membership = await requireMembership(req, groupId);
+    if (!membership.ok) {
+      return res.status(403).json({ error: "You're not a member of this group." });
+    }
+    const existing = await pageStore.getPageInGroup(groupId, pageId);
+    if (!existing) return res.status(404).json({ error: "Page not found." });
+
+    const revision = await pageStore.getRevision(pageId, revisionId);
+    if (!revision) return res.status(404).json({ error: "Revision not found." });
+
+    // Save current content as a revision first (so restore is undoable)
+    await prisma.revision.create({
+      data: {
+        pageId,
+        memberId: membership.userId || null,
+        editedByName: membership.displayName || "Someone",
+        snapshot: existing.content,
+      },
+    });
+
+    const page = await prisma.page.update({
+      where: { id: pageId },
+      data: {
+        content: revision.snapshot,
+        lastEditedByName: membership.displayName || existing.lastEditedByName,
+      },
+    });
+    res.json({ page });
+  } catch (err) {
+    console.error("POST restore failed:", err);
+    res.status(500).json({ error: "Couldn't restore revision." });
+  }
+});
+
 module.exports = router;

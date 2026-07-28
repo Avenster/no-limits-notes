@@ -5,13 +5,86 @@
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+/* ============================================================
+   Theme: CSS custom properties
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+}
+
+/* -- Accent colors ------------------------------------------ */
+[data-accent="violet"], :root {
+  --accent: 139 92 246;
+  --accent-light: 196 181 253;
+}
+[data-accent="blue"] {
+  --accent: 59 130 246;
+  --accent-light: 147 197 253;
+}
+[data-accent="emerald"] {
+  --accent: 16 185 129;
+  --accent-light: 110 231 183;
+}
+[data-accent="rose"] {
+  --accent: 244 63 94;
+  --accent-light: 253 164 175;
+}
+[data-accent="amber"] {
+  --accent: 245 158 11;
+  --accent-light: 253 230 138;
+}
+[data-accent="cyan"] {
+  --accent: 6 182 212;
+  --accent-light: 103 232 249;
+}
+
+/* -- Dark mode (default) ------------------------------------ */
+[data-theme="dark"], :root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-tertiary: #1a1a1a;
+  --surface-1: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.05);
+  --surface-3: rgba(255, 255, 255, 0.08);
+  --surface-4: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --text-primary: #e8e8e8;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-tertiary: rgba(255, 255, 255, 0.4);
+  --text-quaternary: rgba(255, 255, 255, 0.2);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --glow-bg: rgba(255, 255, 255, 0.05);
+}
+
+/* -- Light mode --------------------------------------------- */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary: #fafafa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --surface-1: rgba(0, 0, 0, 0.02);
+  --surface-2: rgba(0, 0, 0, 0.04);
+  --surface-3: rgba(0, 0, 0, 0.06);
+  --surface-4: rgba(0, 0, 0, 0.1);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.16);
+  --text-primary: #1a1a1a;
+  --text-secondary: rgba(0, 0, 0, 0.7);
+  --text-tertiary: rgba(0, 0, 0, 0.45);
+  --text-quaternary: rgba(0, 0, 0, 0.25);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.12);
+  --glow-bg: rgba(0, 0, 0, 0.03);
+}
+
 html,
 body {
-  @apply bg-white dark:bg-gray-950;
-
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
-  }
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-editor, var(--font-sans));
 }
 
 /* ============================================================
@@ -26,10 +99,10 @@ body {
   height: 100vh;
   position: sticky;
   top: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border-right: 1px solid var(--border);
+  background: var(--surface-1);
   backdrop-filter: blur(24px);
-  transition: margin-left 0.2s ease, opacity 0.2s ease;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
 }
 
 .note-sidebar--open {
@@ -45,30 +118,74 @@ body {
 }
 
 /* ============================================================
-   Editor wrapper — wider and with accent border
+   Editor wrapper
    ============================================================ */
 
 .note-editor-wrapper {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
   padding: 8px;
   min-height: 400px;
 }
 
+/* ============================================================
+   Buttons & Utilities
+   ============================================================ */
+
+.btn-outline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgb(var(--accent));
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+
 .note-editor-wrapper:focus-within {
-  border-color: rgba(139, 92, 246, 0.25);
-  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.1), 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-color: rgb(var(--accent) / 0.3);
+  box-shadow: 0 0 0 1px rgb(var(--accent) / 0.12), 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
 /* ============================================================
-   BlockNote overrides — dark theme polish
+   BlockNote overrides
    ============================================================ */
 
-/* Force dark background on the editor root */
 .bn-editor {
   background: transparent !important;
-  color: #e8e8e8 !important;
+  color: var(--text-primary) !important;
 }
 
 /* Code blocks */
@@ -77,8 +194,8 @@ body {
 }
 
 .bn-editor pre {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
   border-radius: 12px !important;
   padding: 16px 20px !important;
   overflow-x: auto;
@@ -86,6 +203,7 @@ body {
   font-size: 13px !important;
   line-height: 1.6 !important;
   tab-size: 2;
+  position: relative;
 }
 
 .bn-editor pre code {
@@ -94,24 +212,20 @@ body {
   border: none !important;
   font-family: inherit !important;
   font-size: inherit !important;
-  color: #c9d1d9 !important;
 }
 
 /* Inline code */
 .bn-editor :not(pre) > code {
-  background: rgba(139, 92, 246, 0.12) !important;
-  color: #c4b5fd !important;
+  background: rgb(var(--accent) / 0.1) !important;
+  color: rgb(var(--accent-light)) !important;
   padding: 2px 6px !important;
   border-radius: 6px !important;
   font-family: "JetBrains Mono", "Fira Code", "SF Mono", monospace !important;
   font-size: 0.875em !important;
-  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  border: 1px solid rgb(var(--accent) / 0.15) !important;
 }
 
-/* ============================================================
-   Table overrides
-   ============================================================ */
-
+/* Tables */
 .bn-editor table {
   width: 100% !important;
   border-collapse: collapse !important;
@@ -122,39 +236,38 @@ body {
 
 .bn-editor th,
 .bn-editor td {
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid var(--border) !important;
   padding: 10px 14px !important;
   text-align: left !important;
   font-size: 14px !important;
 }
 
 .bn-editor th {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: var(--surface-3) !important;
   font-weight: 600 !important;
-  color: #e8e8e8 !important;
+  color: var(--text-primary) !important;
 }
 
 .bn-editor td {
-  background: rgba(255, 255, 255, 0.02) !important;
-  color: rgba(255, 255, 255, 0.7) !important;
+  background: var(--surface-1) !important;
+  color: var(--text-secondary) !important;
 }
 
 .bn-editor tr:hover td {
-  background: rgba(255, 255, 255, 0.04) !important;
+  background: var(--surface-2) !important;
 }
 
-/* ============================================================
-   BlockNote menu/dropdown overrides for dark
-   ============================================================ */
-
-.bn-editor .bn-side-menu,
-.bn-editor .bn-formatting-toolbar,
-.bn-editor .bn-slash-menu,
-.bn-editor .bn-link-toolbar {
-  background: #1a1a1a !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+/* Menus */
+.bn-container .bn-side-menu,
+.bn-container .bn-formatting-toolbar,
+.bn-container .bn-slash-menu,
+.bn-container .bn-link-toolbar,
+.bn-container [class*="Dropdown"],
+.mantine-Menu-dropdown {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--border) !important;
   border-radius: 12px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+  box-shadow: var(--shadow-modal) !important;
 }
 
 /* Headings */
@@ -162,44 +275,44 @@ body {
   font-size: 1.875rem !important;
   font-weight: 700 !important;
   letter-spacing: -0.025em !important;
-  color: #f0f0f0 !important;
+  color: var(--text-primary) !important;
 }
 
 .bn-editor h2 {
   font-size: 1.5rem !important;
   font-weight: 600 !important;
   letter-spacing: -0.02em !important;
-  color: #e8e8e8 !important;
+  color: var(--text-primary) !important;
 }
 
 .bn-editor h3 {
   font-size: 1.25rem !important;
   font-weight: 600 !important;
-  color: #e0e0e0 !important;
+  color: var(--text-primary) !important;
 }
 
 /* Blockquote */
 .bn-editor blockquote {
-  border-left: 3px solid rgba(139, 92, 246, 0.4) !important;
+  border-left: 3px solid rgb(var(--accent) / 0.4) !important;
   padding-left: 16px !important;
-  color: rgba(255, 255, 255, 0.6) !important;
+  color: var(--text-secondary) !important;
   margin: 8px 0 !important;
 }
 
 /* Links */
 .bn-editor a {
-  color: #8b5cf6 !important;
+  color: rgb(var(--accent)) !important;
   text-decoration: underline !important;
-  text-decoration-color: rgba(139, 92, 246, 0.3) !important;
+  text-decoration-color: rgb(var(--accent) / 0.3) !important;
   text-underline-offset: 3px !important;
   transition: text-decoration-color 0.15s ease;
 }
 
 .bn-editor a:hover {
-  text-decoration-color: rgba(139, 92, 246, 0.8) !important;
+  text-decoration-color: rgb(var(--accent) / 0.8) !important;
 }
 
-/* List markers */
+/* Lists */
 .bn-editor ul {
   list-style-type: disc !important;
 }
@@ -208,7 +321,181 @@ body {
   list-style-type: decimal !important;
 }
 
-/* Placeholder text */
+/* Placeholder */
 .bn-editor [data-placeholder]::before {
-  color: rgba(255, 255, 255, 0.2) !important;
+  color: var(--text-quaternary) !important;
+}
+
+/* ============================================================
+   Code block copy button + language label
+   ============================================================ */
+
+.code-block-wrapper {
+  position: relative;
+}
+
+.code-block-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+}
+
+.code-block-wrapper:hover .code-block-actions {
+  opacity: 1;
+}
+
+.code-block-lang {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--text-tertiary);
+}
+
+.code-block-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--surface-3);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.code-block-copy:hover {
+  background: var(--surface-4);
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   Command Palette
+   ============================================================ */
+
+.cmd-palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+}
+
+.cmd-palette {
+  width: 100%;
+  max-width: 560px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+.cmd-palette-input {
+  width: 100%;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+}
+
+.cmd-palette-input::placeholder {
+  color: var(--text-quaternary);
+}
+
+.cmd-palette-results {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.cmd-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  color: var(--text-secondary);
+}
+
+.cmd-palette-item:hover,
+.cmd-palette-item[data-active="true"] {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.cmd-palette-item-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cmd-palette-item-subtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* ============================================================
+   Context menu
+   ============================================================ */
+
+.context-menu {
+  position: fixed;
+  z-index: 90;
+  min-width: 160px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-modal);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  text-align: left;
+}
+
+.context-menu-item:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.context-menu-item--danger:hover {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43e5e;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }

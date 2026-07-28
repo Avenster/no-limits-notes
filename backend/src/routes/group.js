@@ -27,13 +27,27 @@ function setGuestCookie(res, groupId, guestId) {
 router.get("/my-groups", async (req, res) => {
   try {
     if (req.user) {
-      const groups = await groupStore.getGroupsForUser(req.user.id);
+      const memberships = await prisma.groupMember.findMany({
+        where: { userId: req.user.id },
+        select: { groupId: true },
+      });
+      const groupIds = memberships.map((m) => m.groupId);
+      const groups = await prisma.group.findMany({
+        where: { id: { in: groupIds } },
+        include: {
+          _count: { select: { pages: true, members: true } },
+          pages: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
+        },
+      });
       return res.json({
         groups: groups.map((g) => ({
           id: g.id,
           name: g.name,
           code: g.code,
           createdAt: g.createdAt,
+          pageCount: g._count.pages,
+          memberCount: g._count.members,
+          lastActivity: g.pages[0]?.updatedAt || g.createdAt,
         })),
       });
     }
@@ -54,13 +68,22 @@ router.get("/my-groups", async (req, res) => {
     }
 
     if (validGroupIds.length > 0) {
-      const groups = await groupStore.getGroupsByIds(validGroupIds);
+      const groups = await prisma.group.findMany({
+        where: { id: { in: validGroupIds } },
+        include: {
+          _count: { select: { pages: true, members: true } },
+          pages: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
+        },
+      });
       return res.json({
         groups: groups.map((g) => ({
           id: g.id,
           name: g.name,
           code: g.code,
           createdAt: g.createdAt,
+          pageCount: g._count.pages,
+          memberCount: g._count.members,
+          lastActivity: g.pages[0]?.updatedAt || g.createdAt,
         })),
       });
     }
@@ -69,6 +92,69 @@ router.get("/my-groups", async (req, res) => {
   } catch (err) {
     console.error("GET /group/my-groups failed:", err);
     res.status(500).json({ error: "Something went wrong fetching your groups." });
+  }
+});
+
+router.get("/:groupId/members", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const members = await prisma.groupMember.findMany({
+      where: { groupId },
+      include: { user: { select: { name: true, avatarUrl: true } } },
+    });
+    res.json({
+      members: members.map((m) => ({
+        id: m.id,
+        name: m.user?.name || m.guestName || "Guest",
+        avatarUrl: m.user?.avatarUrl || null,
+        role: m.role,
+        isGuest: !m.userId,
+      })),
+    });
+  } catch (err) {
+    console.error("GET members failed:", err);
+    res.status(500).json({ error: "Couldn't load members." });
+  }
+});
+
+router.put("/:groupId", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { name } = req.body || {};
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Name is required." });
+    }
+    const group = await prisma.group.update({
+      where: { id: groupId },
+      data: { name: name.trim() },
+    });
+    res.json({ group });
+  } catch (err) {
+    console.error("PUT group failed:", err);
+    res.status(500).json({ error: "Couldn't rename group." });
+  }
+});
+
+router.delete("/:groupId/members/me", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    if (req.user) {
+      await prisma.groupMember.deleteMany({
+        where: { groupId, userId: req.user.id },
+      });
+    } else {
+      const guestId = req.signedCookies?.[`guest_${groupId}`];
+      if (guestId) {
+        await prisma.groupMember.deleteMany({
+          where: { groupId, guestId },
+        });
+        res.clearCookie(`guest_${groupId}`);
+      }
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE member failed:", err);
+    res.status(500).json({ error: "Couldn't leave group." });
   }
 });
 

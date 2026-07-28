@@ -1,5 +1,5 @@
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useActionData, useNavigation, Form } from "react-router";
+import { useActionData, useNavigation, Form, useLoaderData } from "react-router";
 import { getUser, getBackendUrl } from "~/lib/auth.server";
 
 export const meta: MetaFunction = () => [{ title: "Create a group · Notes" }];
@@ -59,12 +59,16 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function CreatePage() {
+  const { user } = useLoaderData<typeof loader>();
   const actionData = useActionData() as ActionData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0a] px-6">
+    <main 
+      className="relative flex min-h-screen items-center justify-center overflow-hidden px-6"
+      style={{ background: 'var(--bg-primary)' }}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-[-10%] h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-white/[0.06] blur-[120px]"
@@ -72,10 +76,16 @@ export default function CreatePage() {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl">
+          <div 
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border bg-white/[0.04] backdrop-blur-xl"
+            style={{ borderColor: 'var(--border)' }}
+          >
             <PlusMark />
           </div>
-          <h1 className="text-xl font-medium tracking-tight text-[#e8e8e8]">
+          <h1 
+            className="text-xl font-medium tracking-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
             Create a group
           </h1>
           <p className="text-sm text-white/40">
@@ -84,8 +94,8 @@ export default function CreatePage() {
         </div>
 
         <div
-          className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-xl"
-          style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
+          className="rounded-2xl border bg-white/[0.04] p-6 backdrop-blur-xl"
+          style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.4)", borderColor: 'var(--border)' }}
         >
           {actionData?.error && (
             <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-sm text-red-300">
@@ -96,12 +106,18 @@ export default function CreatePage() {
           {actionData?.ok ? (
             <div className="flex flex-col items-center gap-4 py-2 text-center">
               <p className="text-sm text-white/50">
-                <span className="text-[#e8e8e8]">{actionData.name}</span> is
+                <span style={{ color: 'var(--text-primary)' }}>{actionData.name}</span> is
                 ready. Share this code:
               </p>
 
-              <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-5 py-3">
-                <span className="text-2xl font-medium tracking-[0.2em] text-[#e8e8e8]">
+              <div 
+                className="flex items-center gap-2 rounded-xl border px-5 py-3"
+                style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
+              >
+                <span 
+                  className="text-2xl font-medium tracking-[0.2em]"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {actionData.code}
                 </span>
               </div>
@@ -110,7 +126,8 @@ export default function CreatePage() {
 
               <a
                 href={`/group/${actionData.groupId}/pages`}
-                className="mt-2 flex w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.08] px-4 py-2.5 text-sm font-medium text-[#e8e8e8] transition-all duration-150 hover:bg-white/[0.14] hover:border-white/[0.2] active:scale-[0.98]"
+                className="mt-2 flex w-full items-center justify-center rounded-xl border bg-white/[0.08] px-4 py-2.5 text-sm font-medium transition-all duration-150 hover:bg-white/[0.14] hover:border-white/[0.2] active:scale-[0.98]"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
               >
                 Continue
               </a>
@@ -131,43 +148,54 @@ export default function CreatePage() {
                   autoComplete="off"
                   placeholder="e.g. Product team notes"
                   maxLength={60}
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-[#e8e8e8] placeholder:text-white/25 outline-none transition-colors duration-150 focus:border-white/[0.2] focus:bg-white/[0.05]"
+                  className="rounded-xl border px-3.5 py-2.5 text-sm placeholder:text-white/25 outline-none transition-colors duration-150 focus:border-white/[0.2] focus:bg-white/[0.05]"
+                  style={{ borderColor: 'var(--border)', background: 'var(--surface-1)', color: 'var(--text-primary)' }}
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label
-                  htmlFor="displayName"
-                  className="text-xs font-medium text-white/50"
-                >
-                  Display name
-                </label>
-                <input
-                  id="displayName"
-                  name="displayName"
-                  type="text"
-                  autoComplete="name"
-                  placeholder="What should we call you?"
-                  maxLength={40}
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-[#e8e8e8] placeholder:text-white/25 outline-none transition-colors duration-150 focus:border-white/[0.2] focus:bg-white/[0.05]"
-                />
-                <p className="text-xs text-white/30">
-                  Already signed in? This is optional — we'll use your
-                  account name instead.
+              {!user && (
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="displayName"
+                    className="text-xs font-medium text-white/50"
+                  >
+                    Display name
+                  </label>
+                  <input
+                    id="displayName"
+                    name="displayName"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="What should we call you?"
+                    maxLength={40}
+                    className="rounded-xl border px-3.5 py-2.5 text-sm placeholder:text-white/25 outline-none transition-colors duration-150 focus:border-white/[0.2] focus:bg-white/[0.05]"
+                    style={{ borderColor: 'var(--border)', background: 'var(--surface-1)', color: 'var(--text-primary)' }}
+                  />
+                  <p className="text-xs text-white/30">
+                    Already signed in? This is optional — we'll use your
+                    account name instead.
+                  </p>
+                </div>
+              )}
+
+              {user && (
+                <p className="text-center text-sm text-white/50 mt-2">
+                  Signed in as <span style={{ color: 'var(--text-primary)' }}>{user.name}</span>
                 </p>
-              </div>
+              )}
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-1 flex items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.08] px-4 py-2.5 text-sm font-medium text-[#e8e8e8] transition-all duration-150 hover:bg-white/[0.14] hover:border-white/[0.2] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-1 flex items-center justify-center rounded-xl border bg-white/[0.08] px-4 py-2.5 text-sm font-medium transition-all duration-150 hover:bg-white/[0.14] hover:border-white/[0.2] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
               >
                 {isSubmitting ? "Creating…" : "Create group"}
               </button>
             </Form>
           )}
 
-          {!actionData?.ok && (
+          {!actionData?.ok && !user && (
             <>
               <div className="my-6 flex items-center gap-3">
                 <div className="h-px flex-1 bg-white/[0.08]" />
@@ -179,7 +207,8 @@ export default function CreatePage() {
 
               <a
                 href="/join"
-                className="flex items-center justify-center rounded-xl border border-white/[0.08] px-4 py-2.5 text-sm font-medium text-white/70 transition-all duration-150 hover:bg-white/[0.04] hover:text-[#e8e8e8] active:scale-[0.98]"
+                className="flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium text-white/70 transition-all duration-150 hover:bg-white/[0.04] hover:text-[var(--text-primary)] active:scale-[0.98]"
+                style={{ borderColor: 'var(--border)' }}
               >
                 Join a group instead
               </a>
@@ -187,7 +216,7 @@ export default function CreatePage() {
           )}
         </div>
 
-        {!actionData?.ok && (
+        {!actionData?.ok && !user && (
           <p className="mt-6 text-center text-xs text-white/30">
             No account needed — you'll be the group's owner as a guest.
           </p>
@@ -204,7 +233,8 @@ function CopyButton({ code }: { code: string }) {
       onClick={() => {
         navigator.clipboard.writeText(code);
       }}
-      className="flex items-center justify-center rounded-xl border border-white/[0.08] px-4 py-2 text-xs font-medium text-white/70 transition-all duration-150 hover:bg-white/[0.06] hover:text-[#e8e8e8] active:scale-[0.98]"
+      className="flex items-center justify-center rounded-xl border px-4 py-2 text-xs font-medium text-white/70 transition-all duration-150 hover:bg-white/[0.06] hover:text-[var(--text-primary)] active:scale-[0.98]"
+      style={{ borderColor: 'var(--border)' }}
     >
       Copy code
     </button>
@@ -220,13 +250,13 @@ function PlusMark() {
         width="15"
         height="15"
         rx="4"
-        stroke="#e8e8e8"
+        stroke="var(--text-primary)"
         strokeOpacity="0.7"
         strokeWidth="1.4"
       />
       <path
         d="M10 6.5v7M6.5 10h7"
-        stroke="#e8e8e8"
+        stroke="var(--text-primary)"
         strokeOpacity="0.7"
         strokeWidth="1.4"
         strokeLinecap="round"

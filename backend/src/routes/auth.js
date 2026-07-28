@@ -61,6 +61,27 @@ router.get(
 );
 */
 
+router.put("/profile", async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not logged in." });
+  }
+  const { name } = req.body || {};
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Name is required." });
+  }
+  try {
+    const prisma = require("../prisma");
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { name: name.trim() },
+    });
+    res.json({ user });
+  } catch (err) {
+    console.error("PUT /auth/profile failed:", err);
+    res.status(500).json({ error: "Couldn't update profile." });
+  }
+});
+
 // ============================================================
 // GitHub OAuth
 // ============================================================

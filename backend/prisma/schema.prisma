@@ -34,6 +34,7 @@ model User {
   ownedGroups Group[]       @relation("GroupOwner")
   pagesCreated Page[]       @relation("PageCreatedBy")
   revisions   Revision[]
+  favorites   Favorite[]
 
   @@unique([provider, providerId])
 }
@@ -77,6 +78,7 @@ model Page {
   title       String   @default("Untitled")
   icon        String?
   content     Json     @default("{}")
+  order       Int      @default(0)
   createdBy   String?
   // Free-text label for "last edited by X" that works for guests too
   // (guests have no User row, so we can't always rely on the relation).
@@ -91,6 +93,7 @@ model Page {
   children  Page[]      @relation("PageTree")
   creator   User?       @relation("PageCreatedBy", fields: [createdBy], references: [id])
   revisions Revision[]
+  favorites Favorite[]
 
   @@index([groupId])
   @@index([parentId])
@@ -109,5 +112,19 @@ model Revision {
   page Page  @relation(fields: [pageId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [memberId], references: [id])
 
+  @@index([pageId])
+}
+
+model Favorite {
+  id      String  @id @default(cuid())
+  userId  String?
+  guestId String?
+  pageId  String
+
+  page Page  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@unique([userId, pageId])
+  @@unique([guestId, pageId])
   @@index([pageId])
 }

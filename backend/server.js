@@ -96,6 +96,14 @@ app.use("/group", groupRoutes);
 
 app.use("/group/:groupId/pages", pageRoutes);
 
+const activityRouter = require("./src/routes/activity");
+const searchRouter = require("./src/routes/search");
+const favoriteRouter = require("./src/routes/favorite");
+
+app.use("/activity", activityRouter);
+app.use("/search", searchRouter);
+app.use("/group/:groupId/pages", favoriteRouter);
+
 // ============================================================
 // Public Page Routes (no auth — read-only share links)
 // ============================================================
