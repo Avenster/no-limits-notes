@@ -9,6 +9,7 @@ import {
   useFetcher,
   useParams,
   useNavigate,
+  useNavigation,
   Link,
   redirect,
 } from "react-router";
@@ -93,9 +94,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   } catch {}
 
-  // Current user (for the bottom-left profile card) — same source
-  // HomePage uses, so the real GitHub name/avatar show up instead of a
-  // placeholder fetched from a route that doesn't exist.
   const user = await getUser(request);
 
   return {
@@ -178,7 +176,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (!res.ok) return Response.json({ error: "Couldn't duplicate." }, { status: res.status });
     return Response.json({ duplicated: true, page: data?.page });
   }
-
   if (intent === "restore-revision") {
     const revisionId = String(formData.get("revisionId"));
     const cookie = request.headers.get("Cookie");
@@ -224,9 +221,6 @@ function useIsMounted() {
   return mounted;
 }
 
-/** Drives enter transitions for anything that mounts/unmounts conditionally
- *  (popovers, modals, context menus) — flips true one frame after mount so
- *  CSS transitions actually have something to animate from. */
 function useMountTransition(active: boolean) {
   const [entered, setEntered] = useState(false);
   useEffect(() => {
@@ -245,7 +239,10 @@ export default function NotePage() {
     useLoaderData<typeof loader>();
   const params = useParams();
   const navigate = useNavigate();
+  const navigation = useNavigation();
   const mounted = useIsMounted();
+
+  const isPageTransitioning = navigation.state === "loading" && navigation.location.pathname.includes(`/pages/`);
 
   const saveFetcher = useFetcher();
   const shareFetcher = useFetcher();
@@ -255,13 +252,10 @@ export default function NotePage() {
 
   const [title, setTitle] = useState(page.title);
 
-  // useState's initial value only applies on first mount — React Router
-  // reuses this same component instance when navigating between pages in
-  // the same group, so without this the title input kept showing whatever
-  // page was open first. Resync whenever the loaded page actually changes.
   useEffect(() => {
     setTitle(page.title);
   }, [page.id, page.title]);
+  
   const [historyOpen, setHistoryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [copyLabel, setCopyLabel] = useState("Copy link");
@@ -397,9 +391,7 @@ export default function NotePage() {
   const favPages = allPages.filter(p => favIds.has(p.id));
 
   return (
-    <main className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary, #0a0a0a)', color: 'var(--text-primary, #e8e8e8)' }}>
-      {/* Scoped accent-driven interaction styles — reads rgb(var(--accent) so it
-          adapts to whichever accent color is active, no matter what it is. */}
+    <main className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <style>{`
         .glass-btn:hover {
           border-color: color-mix(in srgb, rgb(var(--accent)) 45%, transparent) !important;
@@ -430,7 +422,6 @@ export default function NotePage() {
           border-color: color-mix(in srgb, rgb(var(--accent)) 45%, transparent) !important;
         }
         
-        /* Remove BlockNote default borders and focus rings */
         .note-editor-wrapper .bn-container {
           outline: none !important;
         }
@@ -438,7 +429,6 @@ export default function NotePage() {
           outline: none !important;
         }
         
-        /* Align editor text padding with the title */
         .note-editor-wrapper .bn-editor {
           padding-inline: 0 !important;
         }
@@ -477,6 +467,33 @@ export default function NotePage() {
         .group-name-pill:hover {
           background: rgba(255,255,255,0.04);
         }
+
+        /* skeleton (hoisted so it's not re-injected per mount) */
+        @keyframes note-skeleton-shimmer {
+          0%   { background-position: -200% 0; }
+          100% { background-position:  200% 0; }
+        }
+        .note-skeleton-line {
+          border-radius: 6px;
+          background: linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--surface-2, #1a1a1a) 100%, transparent) 25%,
+            color-mix(in srgb, rgb(var(--accent, 139 92 246)) 12%, var(--surface-2, #1a1a1a)) 50%,
+            color-mix(in srgb, var(--surface-2, #1a1a1a) 100%, transparent) 75%
+          );
+          background-size: 200% 100%;
+          animation: note-skeleton-shimmer 1.6s ease-in-out infinite;
+        }
+
+        /* stable editor section prevents jump between skeleton and real editor */
+        .note-editor-section { view-transition-name: note-editor; }
+
+        /* smooth crossfade when navigating between pages */
+        @view-transition { navigation: auto; }
+        ::view-transition-old(note-editor) { animation: 180ms ease-out both fade-out; }
+        ::view-transition-new(note-editor) { animation: 220ms ease-in  both fade-in;  }
+        @keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes fade-in  { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
 
       <aside
@@ -484,31 +501,27 @@ export default function NotePage() {
           sidebarOpen ? "note-sidebar--open" : "note-sidebar--closed"
         }`}
         style={{
-          background: 'var(--bg-primary, #0a0a0a)',
+          background: 'var(--bg-primary)',
           borderColor: 'transparent',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
         }}
       >
-        <div aria-hidden className="h-px w-full" style={{ background: 'var(--border, rgba(255,255,255,0.08))' }} />
 
-        {/* Flat strip that visually continues into the main header — same
-            height/border as the main content header so the two form one
-            unbroken bar across the top of the app. */}
         <div className="flex mt-2 h-[52px] items-center justify-between px-4" >
           <div className="group-name-pill flex items-center gap-2.5 min-w-0 rounded-xl px-2 py-1.5 -mx-2">
             <div
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold tracking-wide"
               style={{
-                background: 'color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.06)) 86%, transparent)',
-                border: '1px solid var(--border, rgba(255,255,255,0.08))',
-                color: 'var(--text-primary, #e8e8e8)',
+                background: 'color-mix(in srgb, var(--surface-2) 86%, transparent)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
               }}
             >
               {groupInfo?.name?.slice(0, 1).toUpperCase() || "G"}
             </div>
-            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary, #e8e8e8)' }}>
+            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
               {groupInfo?.name || "Group"}
             </span>
           </div>
@@ -517,9 +530,9 @@ export default function NotePage() {
             onClick={() => setSidebarOpen(false)}
             title="Collapse sidebar"
             className="flex h-6 w-6 items-center justify-center rounded-md transition-colors"
-            style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2, rgba(255,255,255,0.06))'; e.currentTarget.style.color = 'var(--text-primary, #e8e8e8)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-tertiary, rgba(255,255,255,0.4))'; }}
+            style={{ color: 'var(--text-tertiary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-tertiary)'; }}
           >
             <PanelLeftClose size={14} strokeWidth={2} />
           </button>
@@ -529,26 +542,25 @@ export default function NotePage() {
           <div
             className="note-search-wrap flex items-center gap-2 rounded-xl px-2.5 py-1.5"
             style={{
-              background: 'color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.04)) 70%, transparent)',
-              border: '1px solid var(--border, rgba(255,255,255,0.08))',
+              background: 'color-mix(in srgb, var(--surface-2) 70%, transparent)',
+              border: '1px solid var(--border)',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 3px rgba(0,0,0,0.06)',
-            }}
-          >
-            <Search size={13} strokeWidth={2} style={{ color: 'var(--text-quaternary, rgba(255,255,255,0.25))', flexShrink: 0 }} />
+            }}>
+            <Search size={13} strokeWidth={2} style={{ color: 'var(--text-quaternary)', flexShrink: 0 }} />
             <input
               type="text"
               placeholder="Search pages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="note-search w-full bg-transparent text-sm outline-none"
-              style={{ color: 'var(--text-primary, #e8e8e8)' }}
+              style={{ color: 'var(--text-primary)' }}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors"
-                style={{ background: 'var(--surface-3, rgba(255,255,255,0.1))', color: 'var(--text-tertiary)' }}
+                style={{ background: 'var(--surface-3)', color: 'var(--text-tertiary)' }}
               >
                 <X size={10} strokeWidth={2.5} />
               </button>
@@ -562,13 +574,13 @@ export default function NotePage() {
             onClick={createNewPage}
             disabled={newPageFetcher.state === "submitting"}
             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-white/[0.06] transition-colors disabled:opacity-60"
-            style={{ color: 'var(--text-secondary, rgba(255,255,255,0.6))' }}
+            style={{ color: 'var(--text-secondary)' }}
           >
             <span
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
               style={{
-                background: 'color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.06)) 86%, transparent)',
-                border: '1px solid var(--border, rgba(255,255,255,0.08))',
+                background: 'color-mix(in srgb, var(--surface-2) 86%, transparent)',
+                border: '1px solid var(--border)',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
               }}
             >
@@ -578,10 +590,11 @@ export default function NotePage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
+        {/* Added scroll-smooth class here */}
+        <div className="flex-1 overflow-y-auto px-2 pb-3 scroll-smooth">
           {favPages.length > 0 && !searchQuery && (
             <div className="mb-4">
-              <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.25))' }}>
+              <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
                 Favorites
               </p>
               <ul className="flex flex-col gap-0.5">
@@ -595,7 +608,7 @@ export default function NotePage() {
                           onChange={(e) => setRenameValue(e.target.value)}
                           onBlur={() => setRenamingId(null)}
                           className="w-full bg-transparent text-sm outline-none"
-                          style={{ color: 'var(--text-primary, #e8e8e8)' }}
+                          style={{ color: 'var(--text-primary)' }}
                         />
                       </form>
                     ) : (
@@ -606,7 +619,7 @@ export default function NotePage() {
                             ? "note-active-row font-medium"
                             : ""
                         }`}
-                        style={{ color: p.id === page.id ? 'var(--text-primary, #e8e8e8)' : 'var(--text-secondary, rgba(255,255,255,0.5))' }}
+                        style={{ color: p.id === page.id ? 'var(--text-primary)' : 'var(--text-secondary)' }}
                       >
                         <FileText
                           size={14}
@@ -623,7 +636,7 @@ export default function NotePage() {
             </div>
           )}
 
-          <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.25))' }}>
+          <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
             Pages
           </p>
           <ul className="flex flex-col gap-0.5">
@@ -637,7 +650,7 @@ export default function NotePage() {
                       onChange={(e) => setRenameValue(e.target.value)}
                       onBlur={() => setRenamingId(null)}
                       className="w-full bg-transparent text-sm outline-none"
-                      style={{ color: 'var(--text-primary, #e8e8e8)' }}
+                      style={{ color: 'var(--text-primary)' }}
                     />
                   </form>
                 ) : (
@@ -648,7 +661,7 @@ export default function NotePage() {
                         ? "note-active-row font-medium"
                         : ""
                     }`}
-                    style={{ color: p.id === page.id ? 'var(--text-primary, #e8e8e8)' : 'var(--text-secondary, rgba(255,255,255,0.5))' }}
+                    style={{ color: p.id === page.id ? 'var(--text-primary)' : 'var(--text-secondary)' }}
                   >
                     <FileText
                       size={14}
@@ -667,7 +680,7 @@ export default function NotePage() {
             <button 
               onClick={() => setMembersExpanded(!membersExpanded)} 
               className="flex w-full items-center justify-between px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-widest hover:text-white/50 transition-colors"
-              style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.25))' }}
+              style={{ color: 'var(--text-tertiary)' }}
             >
               <span className="flex items-center gap-1.5">
                 <Users size={11} strokeWidth={2} />
@@ -678,13 +691,13 @@ export default function NotePage() {
             {membersExpanded && (
               <ul className="flex flex-col gap-0.5 mt-1">
                 {members.map(m => (
-                  <li key={m.id} className="px-2 py-1 flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary, rgba(255,255,255,0.5))' }}>
+                  <li key={m.id} className="px-2 py-1 flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {m.avatarUrl ? (
                       <img src={m.avatarUrl} alt={m.name} className="w-5 h-5 rounded-full object-cover" />
                     ) : (
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
-                        style={{ background: 'var(--surface-2, rgba(255,255,255,0.06))', border: '1px solid var(--border, rgba(255,255,255,0.08))' }}
+                        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
                       >
                         {m.name.charAt(0).toUpperCase()}
                       </div>
@@ -693,7 +706,7 @@ export default function NotePage() {
                     {m.isGuest && (
                       <span
                         className="ml-auto text-[9px] px-1 rounded"
-                        style={{ background: 'var(--surface-2, rgba(255,255,255,0.06))', border: '1px solid var(--border, rgba(255,255,255,0.08))', color: 'var(--text-secondary, rgba(255,255,255,0.6))' }}
+                        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                       >
                         Guest
                       </span>
@@ -705,20 +718,7 @@ export default function NotePage() {
           </div>
         </div>
 
-        {/* <div className=" px-3 py-3" style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))' }}>
-          <Link
-            to="/home"
-            className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs hover:bg-white/[0.06] transition-colors"
-            style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }}
-          >
-            <ArrowLeft size={14} strokeWidth={2} />
-            All groups
-          </Link>
-        </div> */}
-
-        {/* Bottom-left profile / settings card — avatar, name, gear icon.
-            Opens a small popover with account-level actions. */}
-        <div className="relative  px-3 py-3" style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))' }} ref={profileMenuRef}>
+        <div className="relative px-3 py-3" style={{ borderColor: 'var(--border)' }} ref={profileMenuRef}>
           <button
             type="button"
             onClick={(e) => {
@@ -733,26 +733,26 @@ export default function NotePage() {
               <div
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 style={{
-                  background: 'var(--surface-2, rgba(255,255,255,0.06))',
-                  border: '1px solid var(--border, rgba(255,255,255,0.08))',
-                  color: 'var(--text-secondary, rgba(255,255,255,0.7))',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
                 }}
               >
                 {(user?.name || "Guest").charAt(0).toUpperCase()}
               </div>
             )}
-            <span className="min-w-0 flex-1 truncate text-left text-sm font-medium" style={{ color: 'var(--text-primary, #e8e8e8)' }}>
+            <span className="min-w-0 flex-1 truncate text-left text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               {user?.name || "Guest"}
             </span>
-            <Settings size={16} strokeWidth={2} style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }} />
+            <Settings size={16} strokeWidth={2} style={{ color: 'var(--text-tertiary)' }} />
           </button>
 
           {profileMenuOpen && (
             <div
               className="absolute bottom-full left-3 right-3 z-50 mb-2 overflow-hidden rounded-xl border py-1.5 backdrop-blur-xl transition-all duration-150 ease-out"
               style={{
-                background: 'color-mix(in srgb, var(--surface-1, #121212) 92%, transparent)',
-                borderColor: 'var(--border, rgba(255,255,255,0.08))',
+                background: 'color-mix(in srgb, var(--surface-1) 92%, transparent)',
+                borderColor: 'var(--border)',
                 boxShadow: '0 20px 40px -16px rgba(0,0,0,0.6)',
                 opacity: profileMenuEntered ? 1 : 0,
                 transform: profileMenuEntered ? 'translateY(0)' : 'translateY(6px)',
@@ -764,7 +764,7 @@ export default function NotePage() {
                   <Link
                     to="/profile"
                     className="flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors"
-                    style={{ color: 'var(--text-primary, #e8e8e8)' }}
+                    style={{ color: 'var(--text-primary)' }}
                   >
                     <Settings size={14} strokeWidth={2} />
                     Profile settings
@@ -776,7 +776,7 @@ export default function NotePage() {
                       window.location.href = "/login";
                     }}
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-white/[0.06] transition-colors"
-                    style={{ color: 'var(--text-secondary, rgba(255,255,255,0.65))' }}
+                    style={{ color: 'var(--text-secondary)' }}
                   >
                     <ArrowLeft size={14} strokeWidth={2} />
                     Sign out
@@ -786,7 +786,7 @@ export default function NotePage() {
                 <Link
                   to="/login"
                   className="flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors"
-                  style={{ color: 'var(--text-primary, #e8e8e8)' }}
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   Sign in
                 </Link>
@@ -796,23 +796,18 @@ export default function NotePage() {
         </div>
       </aside>
 
-      {/* Main content — floating card with rounded corners */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden p-2 pl-0 mx-2">
         <div
           className="flex-1 flex flex-col min-w-0 overflow-hidden rounded-2xl"
           style={{
-            background: 'var(--surface-1, #141414)',
-            border: '1px solid var(--border, rgba(255,255,255,0.08))',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03)',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-card)',
           }}
         >
-        {/* Flat header, no floating pill container — seamlessly continues
-            the sidebar's top strip so the two form a single bar. Sits
-            outside the scrollable region below so it stays fixed in place
-            while the editor content scrolls underneath it. */}
         <header
           className="flex h-[52px] shrink-0 items-center justify-between px-6 rounded-t-2xl"
-          style={{ borderBottom: '1px solid var(--border, rgba(255,255,255,0.06))' }}
+          style={{ borderBottom: '1px solid var(--border)' }}
         >
           <div className="flex items-center gap-4">
             {!sidebarOpen && (
@@ -842,7 +837,7 @@ export default function NotePage() {
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-quaternary)' }}>
               {saveFetcher.state === "submitting" && (
-                <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: 'rgb(var(--accent, 201 162 75))' }} />
+                <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: 'rgb(var(--accent))' }} />
               )}
               {savingLabel}
             </span>
@@ -857,58 +852,65 @@ export default function NotePage() {
 
             <ThemeToggle />
 
-            {/* Share stays last, as the primary/emphasized action.
-                Filled accent when the page is public, accent-outlined
-                "off" look when it isn't — mirrors the toggle inside
-                the share panel. */}
             <HeaderButton variant="primary" active={sharePage.isPublic} onClick={() => setShareOpen(true)}>
               <Share2 size={14} strokeWidth={2} /> {sharePage.isPublic ? "Shared" : "Share"}
             </HeaderButton>
           </div>
         </header>
 
-        {/* Only this region scrolls — header above stays fixed in place. */}
-        <div className="flex-1 overflow-y-auto">
-          <section className="relative mx-auto w-full max-w-5xl px-5 py-10 sm:px-7">
-            <div className="note-title-wrap relative mb-2">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={handleTitleBlur}
-                placeholder="Untitled"
-                className="w-full bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-white/20"
-                style={{ color: 'var(--text-primary, #e8e8e8)' }}
-              />
-              <span
-                aria-hidden
-                className="note-title-rule pointer-events-none absolute -bottom-1 left-0 h-[2px] w-28 opacity-30"
-                style={{ background: 'linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 85%, white 10%), transparent)' }}
-              />
-            </div>
-            <p className="mb-8 text-xs" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.3))' }}>
-              {page.lastEditedByName
-                ? `Last edited by ${page.lastEditedByName}`
-                : "No edits yet"}
-            </p>
-            <div
-              className="note-editor-wrapper"
-              style={{
-                borderRadius: 20,
-                // border: '1px solid var(--border, rgba(255,255,255,0.07))',
-                background: 'transparent',
-                // padding: 6,
-              }}
-            >
-              {mounted ? (
-                <NoteEditorLoader
-                  key={page.id}
-                  initialContent={initialContent}
-                  onChange={scheduleSave}
-                />
-              ) : (
-                <EditorSkeleton />
-              )}
-            </div>
+        {/* Added scroll-smooth class here */}
+        <div className="flex-1 overflow-y-auto scroll-smooth">
+          <section
+            className="relative mx-auto w-full max-w-5xl px-5 py-10 sm:px-7 note-editor-section"
+            style={{
+              minHeight: '60vh',
+              opacity: isPageTransitioning ? 0 : 1,
+              transition: 'opacity 220ms ease',
+            }}
+          >
+            {isPageTransitioning ? (
+              <EditorSkeleton />
+            ) : (
+              <>
+                <div className="note-title-wrap relative mb-2">
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onBlur={handleTitleBlur}
+                    placeholder="Untitled"
+                    className="w-full bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-white/20"
+                    style={{ color: 'var(--text-primary)' }}
+                  />
+                  <span
+                    aria-hidden
+                    className="note-title-rule pointer-events-none absolute -bottom-1 left-0 h-[2px] w-28 opacity-30"
+                    style={{ background: 'linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent)) 85%, white 10%), transparent)' }}
+                  />
+                </div>
+                <p className="mb-8 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                  {page.lastEditedByName
+                    ? `Last edited by ${page.lastEditedByName}`
+                    : "No edits yet"}
+                </p>
+                <div
+                  className="note-editor-wrapper"
+                  style={{
+                    borderRadius: 20,
+                    background: 'transparent',
+                  }}
+                >
+                  {mounted ? (
+                    <NoteEditorLoader
+                      key={page.id}
+                      initialContent={initialContent}
+                      onChange={scheduleSave}
+                    />
+                  ) : (
+                    <EditorSkeleton />
+                  )}
+                </div>
+              </>
+            )}
           </section>
         </div>
         </div>
@@ -958,39 +960,15 @@ export default function NotePage() {
           style={{ 
             top: contextMenu.y, 
             left: contextMenu.x,
-            background: 'color-mix(in srgb, var(--surface-1, #121212) 92%, transparent)',
-            borderColor: 'var(--border, rgba(255,255,255,0.1))',
+            background: 'color-mix(in srgb, var(--surface-1) 92%, transparent)',
+            borderColor: 'var(--border)',
             boxShadow: '0 20px 44px -14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.04)',
             opacity: menuEntered ? 1 : 0,
             transform: menuEntered ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(-4px)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <style>{`
-            .context-menu-item {
-              display: flex;
-              align-items: center;
-              gap: 0.55rem;
-              width: 100%;
-              text-align: left;
-              padding: 0.45rem 0.75rem;
-              font-size: 0.8125rem;
-              color: var(--text-secondary, rgba(255,255,255,0.75));
-              transition: background 120ms ease, color 120ms ease;
-            }
-            .context-menu-item:hover {
-              background: color-mix(in srgb, rgb(var(--accent, 201 162 75)) 14%, transparent);
-              color: var(--text-primary, #e8e8e8);
-            }
-            .context-menu-item.danger {
-              color: #f87171;
-            }
-            .context-menu-item.danger:hover {
-              background: rgba(248, 113, 113, 0.12);
-              color: #fca5a5;
-            }
-          `}</style>
-          <div aria-hidden className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 55%, transparent), transparent)' }} />
+          <div aria-hidden className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, rgb(var(--accent)) 55%, transparent), transparent)' }} />
           <button 
             className="context-menu-item mt-1"
             onClick={() => {
@@ -1022,17 +1000,13 @@ export default function NotePage() {
             <Copy size={14} strokeWidth={2} />
             Duplicate
           </button>
-          <div className="h-px my-1" style={{ backgroundColor: 'var(--border, rgba(255,255,255,0.08))' }} />
+          <div className="h-px my-1" style={{ backgroundColor: 'var(--border)' }} />
           <button 
-            className="context-menu-item danger"
+            className="context-menu-item context-menu-item--danger"
             onClick={() => {
               const deletingCurrentPage = contextMenu.pageId === page.id;
               actionFetcher.submit({ intent: "delete-page", pageId: contextMenu.pageId }, { method: "post" });
               setContextMenu(null);
-              // Deleting the page you're currently viewing leaves you on a
-              // URL that no longer resolves to anything — the loader's 404
-              // check would trip on the next render. Navigate away instead
-              // of waiting for that to happen.
               if (deletingCurrentPage) {
                 navigate(`/group/${groupId}/pages`);
               }
@@ -1079,9 +1053,9 @@ function HeaderButton({
       disabled={disabled}
       className="glass-btn inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all duration-150 hover:bg-white/[0.05] active:scale-[0.97] disabled:opacity-50"
       style={{
-        borderColor: 'var(--border, rgba(255,255,255,0.1))',
-        color: 'var(--text-secondary, rgba(255,255,255,0.7))',
-        background: 'color-mix(in srgb, var(--surface-1, #121212) 45%, transparent)',
+        borderColor: 'var(--border)',
+        color: 'var(--text-secondary)',
+        background: 'color-mix(in srgb, var(--surface-1) 45%, transparent)',
         backdropFilter: 'blur(12px)',
       }}
     >
@@ -1090,31 +1064,9 @@ function HeaderButton({
   );
 }
 
-/**
- * Skeleton shown while the editor bundle is loading or before hydration.
- * Mirrors the rough shape of a title + paragraph + code block so the
- * layout doesn't visibly jump once the real editor mounts.
- */
 function EditorSkeleton() {
   return (
     <div className="p-6" aria-hidden>
-      <style>{`
-        @keyframes note-skeleton-shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
-        .note-skeleton-line {
-          border-radius: 6px;
-          background: linear-gradient(
-            90deg,
-            color-mix(in srgb, var(--surface-2, #1a1a1a) 100%, transparent) 25%,
-            color-mix(in srgb, rgb(var(--accent, 201 162 75)) 12%, var(--surface-2, #1a1a1a) 50%,
-            color-mix(in srgb, var(--surface-2, #1a1a1a) 100%, transparent) 75%
-          );
-          background-size: 200% 100%;
-          animation: note-skeleton-shimmer 1.6s ease-in-out infinite;
-        }
-      `}</style>
       <div className="note-skeleton-line mb-4 h-6 w-2/5" />
       <div className="mb-2.5 flex flex-col gap-2">
         <div className="note-skeleton-line h-3.5 w-full" />
@@ -1168,15 +1120,15 @@ function HistoryPanel({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-6"
       onClick={onClose}
     >
       <div
         className="relative w-full max-w-md overflow-hidden rounded-2xl border p-6 backdrop-blur-xl transition-all duration-200 ease-out"
         style={{
-          boxShadow: "0 24px 48px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05)",
-          background: 'color-mix(in srgb, var(--surface-1, #121212) 90%, transparent)',
-          borderColor: 'var(--border, rgba(255,255,255,0.08))',
+          boxShadow: 'var(--shadow-modal)',
+          background: 'var(--bg-secondary)',
+          borderColor: 'var(--border)',
           opacity: entered ? 1 : 0,
           transform: entered ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(8px)',
         }}
@@ -1185,25 +1137,25 @@ function HistoryPanel({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-60"
-          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 20%, transparent), transparent 70%)' }}
+          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, rgb(var(--accent)) 20%, transparent), transparent 70%)' }}
         />
         <div className="relative">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary, #e8e8e8)' }}>Edit history</h2>
+            <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Edit history</h2>
             <button
               type="button"
               onClick={onClose}
               className="text-xs hover:text-white/70"
-              style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }}
+              style={{ color: 'var(--text-tertiary)' }}
             >
               <X size={14} strokeWidth={2} />
             </button>
           </div>
 
           {isLoading ? (
-            <p className="text-sm" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Loading…</p>
           ) : revisions.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.4))' }}>
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
               No saved versions yet — history builds up as you keep editing.
             </p>
           ) : (
@@ -1211,14 +1163,14 @@ function HistoryPanel({
               {revisions.map((rev) => (
                 <li
                   key={rev.id}
-                  className="flex items-center justify-between rounded-xl border bg-white/[0.03] px-3.5 py-2.5"
-                  style={{ borderColor: 'var(--border, rgba(255,255,255,0.08))' }}
+                  className="flex items-center justify-between rounded-xl border px-3.5 py-2.5"
+                  style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}
                 >
                   <div>
-                    <p className="text-xs font-medium" style={{ color: 'var(--text-primary, #e8e8e8)' }}>
+                    <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                       {rev.editedByName || "Someone"}
                     </p>
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary, rgba(255,255,255,0.3))' }}>
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       {new Date(rev.createdAt).toLocaleString()}
                     </p>
                   </div>
@@ -1261,7 +1213,7 @@ function SharePanel({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-6"
-      style={{ background: 'var(--glow-bg, rgba(0,0,0,0.2))' }}
+      style={{ background: 'var(--glow-bg)' }}
       onClick={onClose}
     >
       <div
@@ -1278,7 +1230,7 @@ function SharePanel({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-60"
-          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 20%, transparent), transparent 70%)' }}
+          style={{ background: 'radial-gradient(160px 90px at 100% 0%, color-mix(in srgb, rgb(var(--accent)) 20%, transparent), transparent 70%)' }}
         />
         <div className="relative">
           <div className="mb-4 flex items-center justify-between">
@@ -1312,13 +1264,13 @@ function SharePanel({
               className="relative h-6 w-11 shrink-0 rounded-full border transition-all duration-150 disabled:opacity-50"
               style={{
                 background: isPublic
-                  ? 'rgb(var(--accent, 201 162 75))'
+                  ? 'rgb(var(--accent))'
                   : 'var(--surface-3)',
                 borderColor: isPublic
                   ? 'transparent'
                   : 'var(--border)',
                 boxShadow: isPublic
-                  ? '0 2px 8px -2px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 70%, transparent)'
+                  ? '0 2px 8px -2px color-mix(in srgb, rgb(var(--accent)) 70%, transparent)'
                   : 'none',
               }}
             >

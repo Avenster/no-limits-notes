@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 
+
 type CreatedGroup = { code: string; name: string; groupId: string };
 
 export function CreateGroupModal({

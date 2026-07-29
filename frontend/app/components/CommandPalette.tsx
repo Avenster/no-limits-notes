@@ -1,6 +1,37 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
+import { glassPanelStyle, glassInputStyle, glassOverlayStyle } from "~/lib/glass";
 
+const overlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 60,
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "center",
+  paddingTop: "15vh",
+  paddingLeft: "1rem",
+  paddingRight: "1rem",
+  ...glassOverlayStyle,
+};
+
+const panelStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "36rem",
+  overflow: "hidden",
+  borderRadius: "16px",
+  ...glassPanelStyle(),
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  ...glassInputStyle,
+  border: "none",
+  outline: "none",
+  padding: "16px 20px",
+  fontSize: "15px",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 85%, transparent)",
+};
 export type SearchItem = {
   id: string;
   title: string;
