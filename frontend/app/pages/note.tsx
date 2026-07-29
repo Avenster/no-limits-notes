@@ -459,18 +459,12 @@ export default function NotePage() {
           box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 10%, transparent);
           background: color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.04)) 85%, transparent) !important;
         }
-        .note-active-row { position: relative; }
-        .note-active-row::before {
-          content: "";
-          position: absolute;
-          left: -8px;
-          top: 18%;
-          bottom: 18%;
-          width: 2px;
-          border-radius: 2px;
-          background: linear-gradient(180deg,
-            color-mix(in srgb, rgb(var(--accent, 201 162 75)) 90%, white 10%),
-            color-mix(in srgb, rgb(var(--accent, 201 162 75)) 55%, transparent);
+        .note-page-row { border: 1px solid transparent; }
+        .note-page-row:hover { background: color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.06)) 80%, transparent); }
+        .note-active-row {
+          background: color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.06)) 82%, transparent);
+          border-color: var(--border, rgba(255,255,255,0.08));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.045);
         }
         .note-title-rule { transition: opacity 250ms ease; }
         .note-title-wrap:focus-within .note-title-rule { opacity: 1; }
@@ -496,7 +490,7 @@ export default function NotePage() {
           WebkitBackdropFilter: 'blur(24px)',
         }}
       >
-        <div aria-hidden className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 45%, transparent), transparent)' }} />
+        <div aria-hidden className="h-px w-full" style={{ background: 'var(--border, rgba(255,255,255,0.08))' }} />
 
         {/* Flat strip that visually continues into the main header — same
             height/border as the main content header so the two form one
@@ -506,9 +500,10 @@ export default function NotePage() {
             <div
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold tracking-wide"
               style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 90%, white 10%), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 70%, black 15%)',
-                color: '#fff',
-                boxShadow: '0 2px 8px -2px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 60%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)',
+                background: 'color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.06)) 86%, transparent)',
+                border: '1px solid var(--border, rgba(255,255,255,0.08))',
+                color: 'var(--text-primary, #e8e8e8)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
               }}
             >
               {groupInfo?.name?.slice(0, 1).toUpperCase() || "G"}
@@ -572,8 +567,9 @@ export default function NotePage() {
             <span
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
               style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 90%, white 10%), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 65%, black 15%)',
-                boxShadow: '0 2px 8px -2px color-mix(in srgb, rgb(var(--accent, 201 162 75)) 70%, transparent)',
+                background: 'color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.06)) 86%, transparent)',
+                border: '1px solid var(--border, rgba(255,255,255,0.08))',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
               }}
             >
               <Plus size={10} strokeWidth={2.2} color="white" />
@@ -605,10 +601,10 @@ export default function NotePage() {
                     ) : (
                       <Link
                         to={`/group/${groupId}/pages/${p.id}`}
-                        className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+                        className={`note-page-row flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
                           p.id === page.id
-                            ? "note-active-row bg-white/[0.08] font-medium"
-                            : "hover:bg-white/[0.04]"
+                            ? "note-active-row font-medium"
+                            : ""
                         }`}
                         style={{ color: p.id === page.id ? 'var(--text-primary, #e8e8e8)' : 'var(--text-secondary, rgba(255,255,255,0.5))' }}
                       >
@@ -647,10 +643,10 @@ export default function NotePage() {
                 ) : (
                   <Link
                     to={`/group/${groupId}/pages/${p.id}`}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+                    className={`note-page-row flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
                       p.id === page.id
-                        ? "note-active-row bg-white/[0.08] font-medium"
-                        : "hover:bg-white/[0.04]"
+                        ? "note-active-row font-medium"
+                        : ""
                     }`}
                     style={{ color: p.id === page.id ? 'var(--text-primary, #e8e8e8)' : 'var(--text-secondary, rgba(255,255,255,0.5))' }}
                   >
@@ -688,7 +684,7 @@ export default function NotePage() {
                     ) : (
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
-                        style={{ background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 35%, rgba(255,255,255,0.08)), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 8%, transparent)' }}
+                        style={{ background: 'var(--surface-2, rgba(255,255,255,0.06))', border: '1px solid var(--border, rgba(255,255,255,0.08))' }}
                       >
                         {m.name.charAt(0).toUpperCase()}
                       </div>
@@ -697,7 +693,7 @@ export default function NotePage() {
                     {m.isGuest && (
                       <span
                         className="ml-auto text-[9px] px-1 rounded"
-                        style={{ background: 'color-mix(in srgb, rgb(var(--accent, 201 162 75)) 18%, transparent)', color: 'var(--text-secondary, rgba(255,255,255,0.6))' }}
+                        style={{ background: 'var(--surface-2, rgba(255,255,255,0.06))', border: '1px solid var(--border, rgba(255,255,255,0.08))', color: 'var(--text-secondary, rgba(255,255,255,0.6))' }}
                       >
                         Guest
                       </span>
@@ -737,8 +733,9 @@ export default function NotePage() {
               <div
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 style={{
-                  background: 'linear-gradient(135deg, color-mix(in srgb, rgb(var(--accent, 201 162 75)) 40%, rgba(255,255,255,0.08)), color-mix(in srgb, rgb(var(--accent, 201 162 75)) 10%, transparent)',
-                  color: 'rgb(var(--accent, 201 162 75))',
+                  background: 'var(--surface-2, rgba(255,255,255,0.06))',
+                  border: '1px solid var(--border, rgba(255,255,255,0.08))',
+                  color: 'var(--text-secondary, rgba(255,255,255,0.7))',
                 }}
               >
                 {(user?.name || "Guest").charAt(0).toUpperCase()}
@@ -872,7 +869,7 @@ export default function NotePage() {
 
         {/* Only this region scrolls — header above stays fixed in place. */}
         <div className="flex-1 overflow-y-auto">
-          <section className="relative mx-auto w-full max-w-5xl py-10">
+          <section className="relative mx-auto w-full max-w-5xl px-5 py-10 sm:px-7">
             <div className="note-title-wrap relative mb-2">
               <input
                 value={title}

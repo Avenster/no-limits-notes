@@ -1,8 +1,9 @@
-import { Link } from "react-router";
-import type { MetaFunction } from "react-router";
+import { Link, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { Reveal } from "~/hooks/useScrollReveal";
 import { useCountUp } from "~/hooks/useCountUp";
+import { getUser } from "~/lib/auth.server";
 
 export const meta: MetaFunction = () => {
   return [
@@ -21,6 +22,11 @@ export const meta: MetaFunction = () => {
     { name: "theme-color", content: "#070708" },
   ];
 };
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const user = await getUser(request);
+  return { user };
+}
 
 const avatars = [
   { name: "Arjun", color: "#a78bfa", initials: "AJ" },
@@ -451,7 +457,38 @@ function StatNumber({ stat }: { stat: (typeof stats)[number] }) {
   );
 }
 
+type LandingUser = {
+  name: string;
+  avatarUrl: string | null;
+};
+
+function LandingUserPill({ user }: { user: LandingUser }) {
+  return (
+    <Link
+      to="/profile"
+      title="Profile settings"
+      className="group inline-flex h-11 max-w-[260px] items-center gap-3 rounded-full border border-white/[0.10] bg-white/[0.055] py-1 pl-1.5 pr-4 text-sm font-semibold text-white/70 no-underline shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-px hover:border-white/[0.16] hover:bg-white/[0.08] hover:text-white"
+    >
+      {user.avatarUrl ? (
+        <img
+          src={user.avatarUrl}
+          alt=""
+          className="h-8 w-8 rounded-full object-cover ring-1 ring-white/[0.10] transition-transform duration-200 group-hover:scale-105"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.08] text-xs font-bold text-white/70 ring-1 ring-white/[0.10]">
+          {user.name.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <span className="min-w-0 truncate">{user.name}</span>
+    </Link>
+  );
+}
+
 export default function Home() {
+  const { user } = useLoaderData<typeof loader>();
+
   return (
     <main
       className="relative min-h-screen overflow-x-hidden antialiased text-[#e8e8e8]"
@@ -504,19 +541,25 @@ export default function Home() {
             <span className="text-[15px] font-bold tracking-[-0.3px] text-white">Noteblock</span>
           </Link>
           <div className="flex items-center gap-2.5">
-            <Link
-              to="/login"
-              className="rounded-lg px-3.5 py-1.5 text-sm font-medium text-white/45 no-underline transition-colors hover:bg-white/[0.06] hover:text-white"
-            >
-              Sign in
-            </Link>
-            <Link
-              to="/create"
-              className="rounded-[10px] bg-white px-[18px] py-2 text-sm font-semibold text-[#070708] no-underline transition-all hover:-translate-y-px hover:opacity-90"
-              style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.3)" }}
-            >
-              Start free
-            </Link>
+            {user ? (
+              <LandingUserPill user={user} />
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="rounded-lg px-3.5 py-1.5 text-sm font-medium text-white/45 no-underline transition-colors hover:bg-white/[0.06] hover:text-white"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/create"
+                  className="rounded-[10px] bg-white px-[18px] py-2 text-sm font-semibold text-[#070708] no-underline transition-all hover:-translate-y-px hover:opacity-90"
+                  style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.3)" }}
+                >
+                  Start free
+                </Link>
+              </>
+            )}
           </div>
         </nav>
 

@@ -1,13 +1,15 @@
 import type { MetaFunction, LoaderFunctionArgs } from "react-router";
-import { redirect, useLoaderData, Link } from "react-router";
+import { redirect, useLoaderData, Link, Await, useRevalidator } from "react-router";
 import { getUser, getBackendUrl } from "~/lib/auth.server";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { FileEdit, Activity, Clock, Users, FileText, Zap } from "lucide-react";
 import { Reveal } from "~/hooks/useScrollReveal";
 import { useCountUp } from "~/hooks/useCountUp";
 import CommandPalette, { type SearchItem } from "~/components/CommandPalette";
-import { NotesMark, PlusIcon, ArrowRightIcon } from "~/components/icons";
-
+import { PlusIcon, ArrowRightIcon } from "~/components/icons";
+import { ArrowRight, Plus, Trash2 } from "lucide-react";
+import { ThemeToggle } from "~/components/ThemeToggle";
+import { Skeleton, SkeletonCard } from "~/components/ui/Skeleton";
 export const meta: MetaFunction = () => [{ title: "Notes" }];
 
 type Group = {
@@ -33,36 +35,31 @@ type ActivityItem = {
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getUser(request);
   const backendUrl = getBackendUrl();
+  const cookie = request.headers.get("Cookie") || "";
 
-  let groups: Group[] = [];
-  try {
-    const cookie = request.headers.get("Cookie");
-    const res = await fetch(`${backendUrl}/group/my-groups`, {
-      headers: cookie ? { Cookie: cookie } : undefined,
-    });
-    if (res.ok) {
-      const data = await res.json();
-      groups = data.groups || [];
-    }
-  } catch (err) {
+  // Synchronous redirect for unauthenticated users without guest cookies
+  if (!user && !cookie.includes("guest_")) return redirect("/login");
+
+  const groupsPromise = fetch(`${backendUrl}/group/my-groups`, {
+    headers: cookie ? { Cookie: cookie } : undefined,
+  }).then(async (res) => {
+    if (!res.ok) throw new Error("Failed to fetch groups");
+    const data = await res.json();
+    return data.groups || [];
+  }).catch((err) => {
     console.error("Failed to fetch groups:", err);
-  }
+    return [];
+  });
 
-  let activity: ActivityItem[] = [];
-  try {
-    const cookie = request.headers.get("Cookie");
-    const actRes = await fetch(`${backendUrl}/activity/recent`, {
-      headers: cookie ? { Cookie: cookie } : undefined,
-    });
-    if (actRes.ok) {
-      const actData = await actRes.json();
-      activity = actData.activity || [];
-    }
-  } catch {}
+  const activityPromise = fetch(`${backendUrl}/activity/recent`, {
+    headers: cookie ? { Cookie: cookie } : undefined,
+  }).then(async (res) => {
+    if (!res.ok) throw new Error("Failed to fetch activity");
+    const actData = await res.json();
+    return actData.activity || [];
+  }).catch(() => []);
 
-  if (!user && groups.length === 0) return redirect("/login");
-
-  return { user, backendUrl, groups, activity };
+  return { user, backendUrl, groups: groupsPromise, activity: activityPromise };
 }
 
 function greeting() {
@@ -75,73 +72,11 @@ function greeting() {
 export default function HomePage() {
   const { user, backendUrl, groups, activity } = useLoaderData<typeof loader>();
   const [profileOpen, setProfileOpen] = useState(false);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [spotlight, setSpotlight] = useState<{ x: number; y: number } | null>(null);
-
-  // Dynamic stats derived from real loader data (never hardcoded).
-  const stats = useMemo(() => {
-    const totalPages = groups.reduce((s, g) => s + (g.pageCount || 0), 0);
-    const totalMembers = groups.reduce((s, g) => s + (g.memberCount || 0), 0);
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const editsThisWeek = activity.filter((a) => new Date(a.createdAt).getTime() > weekAgo).length;
-    return { groups: groups.length, totalPages, totalMembers, editsThisWeek };
-  }, [groups, activity]);
-
-  // Command palette gets real, dynamic items: groups + recently touched pages.
-  const paletteItems: SearchItem[] = useMemo(() => {
-    const groupItems: SearchItem[] = groups.map((g) => ({
-      id: `group-${g.id}`,
-      title: g.name,
-      subtitle: `${g.pageCount || 0} pages · ${g.memberCount || 0} members`,
-      href: `/group/${g.id}/pages`,
-      icon: "group",
-    }));
-    const seenPages = new Set<string>();
-    const pageItems: SearchItem[] = activity
-      .filter((a) => {
-        if (seenPages.has(a.pageId)) return false;
-        seenPages.add(a.pageId);
-        return true;
-      })
-      .slice(0, 8)
-      .map((a) => ({
-        id: `page-${a.pageId}`,
-        title: a.pageTitle,
-        subtitle: a.groupName,
-        href: `/group/${a.groupId}/pages/${a.pageId}`,
-        icon: "page",
-      }));
-    return [...groupItems, ...pageItems];
-  }, [groups, activity]);
-
-  // Group repetitive activities by the same user on the same page.
-  const groupedActivity = activity.reduce((acc, curr) => {
-    const last = acc[acc.length - 1];
-    if (last && last.pageId === curr.pageId && last.editedByName === curr.editedByName) {
-      last.count = (last.count || 1) + 1;
-    } else {
-      acc.push({ ...curr, count: 1 });
-    }
-    return acc;
-  }, [] as (ActivityItem & { count?: number })[]);
-
-  function copyCode(code: string) {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
-  }
-
-  function handleHeroMove(e: React.MouseEvent<HTMLElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setSpotlight({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  }
-
-  const firstName = user?.name.split(" ")[0] || "";
 
   return (
     <main
       style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
-      className="relative min-h-screen overflow-hidden"
+      className="relative h-screen flex flex-col overflow-hidden"
     >
       {/* Ambient accent orb */}
       <div
@@ -150,21 +85,14 @@ export default function HomePage() {
         style={{ background: "linear-gradient(135deg, rgb(var(--accent) / 0.15), rgb(var(--accent-light) / 0.08))" }}
       />
 
-      <CommandPalette items={paletteItems} />
-
       {/* ── Header ── */}
       <header
         style={{ borderBottom: "1px solid var(--border)", background: "rgb(var(--bg-secondary) / 0.6)", backdropFilter: "blur(12px)" }}
-        className="sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 sm:px-8"
+        className="shrink-0 sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 sm:px-8"
       >
         <Link to="/home" className="flex items-center gap-2.5 no-underline" style={{ color: "var(--text-primary)" }}>
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg"
-            style={{ border: "1px solid var(--border)", background: "var(--surface-2)" }}
-          >
-            <NotesMark />
-          </div>
-          <span className="text-sm font-semibold tracking-tight">Notes</span>
+          <NoteblockMark />
+          <span className="text-[15px] font-bold tracking-[-0.3px]">Noteblock</span>
         </Link>
 
         <div className="flex items-center gap-2.5">
@@ -179,6 +107,8 @@ export default function HomePage() {
           >
             <span style={{ opacity: 0.7 }}>⌘K</span>
           </button>
+
+          <ThemeToggle />
 
           {user ? (
             <div className="relative">
@@ -237,26 +167,122 @@ export default function HomePage() {
         </div>
       </header>
 
+      <Suspense fallback={<DashboardSkeleton />}>
+        <Await resolve={Promise.all([groups, activity])}>
+          {([resolvedGroups, resolvedActivity]) => (
+            <DashboardContent user={user} backendUrl={backendUrl} groups={resolvedGroups} activity={resolvedActivity} />
+          )}
+        </Await>
+      </Suspense>
+    </main>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex-1 overflow-y-auto px-6 pb-20 pt-8 sm:px-8 custom-scrollbar">
+      <div className="mx-auto max-w-6xl space-y-12 pt-6">
+        <div className="space-y-4">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-5 w-48" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <div className="grid gap-12 lg:grid-cols-3 pt-6">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex justify-between items-center">
+               <Skeleton className="h-6 w-32" />
+               <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <div className="space-y-3">
+              <Skeleton className="h-[72px] w-full rounded-xl" />
+              <Skeleton className="h-[72px] w-full rounded-xl" />
+              <Skeleton className="h-[72px] w-full rounded-xl" />
+            </div>
+          </div>
+          <div className="lg:col-span-1 space-y-4">
+             <Skeleton className="h-6 w-32" />
+             <Skeleton className="h-[300px] w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardContent({ user, backendUrl, groups, activity }: { user: any, backendUrl: string, groups: Group[], activity: ActivityItem[] }) {
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const revalidator = useRevalidator();
+  const firstName = user?.name.split(" ")[0] || "";
+
+  // Dynamic stats derived from real loader data (never hardcoded).
+  const stats = useMemo(() => {
+    const totalPages = groups.reduce((s, g) => s + (g.pageCount || 0), 0);
+    const totalMembers = groups.reduce((s, g) => s + (g.memberCount || 0), 0);
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const editsThisWeek = activity.filter((a) => new Date(a.createdAt).getTime() > weekAgo).length;
+    return { groups: groups.length, totalPages, totalMembers, editsThisWeek };
+  }, [groups, activity]);
+
+  // Command palette gets real, dynamic items: groups + recently touched pages.
+  const paletteItems: SearchItem[] = useMemo(() => {
+    const groupItems: SearchItem[] = groups.map((g) => ({
+      id: `group-${g.id}`,
+      title: g.name,
+      subtitle: `${g.pageCount || 0} pages · ${g.memberCount || 0} members`,
+      href: `/group/${g.id}/pages`,
+      icon: "group",
+    }));
+    const seenPages = new Set<string>();
+    const pageItems: SearchItem[] = activity
+      .filter((a) => {
+        if (seenPages.has(a.pageId)) return false;
+        seenPages.add(a.pageId);
+        return true;
+      })
+      .slice(0, 8)
+      .map((a) => ({
+        id: `page-${a.pageId}`,
+        title: a.pageTitle,
+        subtitle: a.groupName,
+        href: `/group/${a.groupId}/pages/${a.pageId}`,
+        icon: "page",
+      }));
+    return [...groupItems, ...pageItems];
+  }, [groups, activity]);
+
+  // Group repetitive activities by the same user on the same page.
+  const groupedActivity = activity.reduce((acc, curr) => {
+    const last = acc[acc.length - 1];
+    if (last && last.pageId === curr.pageId && last.editedByName === curr.editedByName) {
+      last.count = (last.count || 1) + 1;
+    } else {
+      acc.push({ ...curr, count: 1 });
+    }
+    return acc;
+  }, [] as (ActivityItem & { count?: number })[]);
+
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
+  }
+
+  return (
+    <>
+      <CommandPalette items={paletteItems} />
+
       {/* ── Hero with spotlight + dynamic stats ── */}
       <section
-        onMouseMove={handleHeroMove}
-        onMouseLeave={() => setSpotlight(null)}
-        className="relative mx-auto max-w-6xl px-6 pt-14 pb-2 sm:px-8"
+        className="shrink-0 relative z-10 mx-auto w-full max-w-6xl px-6 pt-14 pb-2 sm:px-8"
       >
-        {/* Pointer-following spotlight */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 transition-opacity duration-300"
-          style={{
-            opacity: spotlight ? 1 : 0,
-            background: spotlight
-              ? `radial-gradient(420px circle at ${spotlight.x}px ${spotlight.y}px, rgb(var(--accent) / 0.10), transparent 70%)`
-              : "none",
-          }}
-        />
-
         <div className="relative">
-          <Reveal>
+          <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em]" style={{ color: "rgb(var(--accent))" }}>
               {greeting()}
             </p>
@@ -266,60 +292,59 @@ export default function HomePage() {
             <p className="mt-2 text-sm" style={{ color: "var(--text-tertiary)" }}>
               Your workspaces and recent activity, at a glance.
             </p>
-          </Reveal>
+          </div>
 
           {/* Dynamic count-up stats */}
-          <Reveal delay={100}>
+          <div>
             <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <StatCard icon={<FileText size={15} />} label="Groups" end={stats.groups} />
               <StatCard icon={<FileEdit size={15} />} label="Pages" end={stats.totalPages} />
               <StatCard icon={<Users size={15} />} label="Members" end={stats.totalMembers} />
               <StatCard icon={<Zap size={15} />} label="Edits / week" end={stats.editsThisWeek} />
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
 
       {/* ── Main content ── */}
-      <section className="relative mx-auto max-w-6xl px-6 pb-20 pt-10 sm:px-8">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      <section className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-8 pt-10 sm:px-8 flex-1 min-h-0 flex flex-col">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 flex-1 min-h-0">
           {/* Left column — 2/3 */}
-          <div className="flex flex-col gap-8 lg:col-span-2">
-            {/* Quick actions */}
+          <div className="flex flex-col gap-8 lg:col-span-2 overflow-y-auto custom-scrollbar p-2 -m-2">
+            {/* Groups list */}
             <Reveal>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <ActionCard
-                  to="/create"
-                  title="Create a group"
-                  description="Start a fresh space for collaborative notes."
-                  icon={<PlusIcon />}
-                />
-                <ActionCard
-                  to="/join"
-                  title="Join a group"
-                  description="Have a code? Enter it to join an existing group."
-                  icon={<ArrowRightIcon />}
-                />
-              </div>
-            </Reveal>
-
-            {/* Groups — bento grid */}
-            <div>
-              <Reveal>
-                <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
                   <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
-                    Your groups
+                    Your Groups
                   </h2>
-                  <span className="text-xs" style={{ color: "var(--text-quaternary)" }}>
-                    {groups.length} {groups.length === 1 ? "group" : "groups"}
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: "var(--surface-1)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>
+                    {stats.groups}
                   </span>
                 </div>
-              </Reveal>
-
+                <div className="flex items-center gap-1">
+                  <Link
+                    to="/join"
+                    className="group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-all duration-150 active:scale-95 hover:bg-[var(--surface-1)]"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-primary)]" />
+                    <span className="text-xs font-medium group-hover:text-[var(--text-primary)]">Join</span>
+                  </Link>
+                  <Link
+                    to="/create"
+                    className="group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-all duration-150 active:scale-95 hover:bg-[var(--surface-1)]"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <Plus size={13} className="transition-transform group-hover:scale-110 group-hover:text-[var(--text-primary)]" />
+                    <span className="text-xs font-medium group-hover:text-[var(--text-primary)]">Create</span>
+                  </Link>
+                </div>
+              </div>
               {groups.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
                   {groups.map((group, i) => (
-                    <Reveal key={group.id} delay={i * 60} as="div">
+                    <Reveal key={group.id} delay={i * 50} as="div">
                       <GroupCard
                         group={group}
                         copied={copiedCode === group.code}
@@ -338,14 +363,14 @@ export default function HomePage() {
                   </p>
                 </div>
               )}
-            </div>
+            </Reveal>
           </div>
 
           {/* Right column — 1/3 — Activity feed */}
-          <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-24">
+          <div className="lg:col-span-1 relative">
+            <div className="lg:absolute lg:inset-0 flex flex-col">
               <Reveal>
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-4 flex items-center justify-between shrink-0">
                   <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
                     Recent activity
                   </h2>
@@ -355,11 +380,11 @@ export default function HomePage() {
 
               {groupedActivity.length > 0 ? (
                 <div
-                  className="flex flex-col gap-0.5 rounded-xl p-1.5"
+                  className="flex flex-col gap-0.5 rounded-xl p-1.5 overflow-y-auto custom-scrollbar lg:flex-1"
                   style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
                 >
                   {groupedActivity.slice(0, 8).map((a, i) => (
-                    <Reveal key={a.id} delay={i * 50} as="div">
+                    <div key={a.id}>
                       <Link
                         to={`/group/${a.groupId}/pages/${a.pageId}`}
                         className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-200"
@@ -397,7 +422,7 @@ export default function HomePage() {
                           </div>
                         </div>
                       </Link>
-                    </Reveal>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -418,7 +443,18 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-    </main>
+    </>
+  );
+}
+
+function NoteblockMark() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor" opacity="0.9" />
+      <rect x="12" y="2" width="8" height="8" rx="2" fill="currentColor" opacity="0.5" />
+      <rect x="2" y="12" width="8" height="8" rx="2" fill="currentColor" opacity="0.5" />
+      <rect x="12" y="12" width="8" height="8" rx="2" fill="currentColor" opacity="0.25" />
+    </svg>
   );
 }
 
@@ -432,7 +468,7 @@ function StatCard({ icon, label, end }: { icon: React.ReactNode; label: string; 
     >
       <div
         className="flex h-7 w-7 items-center justify-center rounded-lg"
-        style={{ background: "rgb(var(--accent) / 0.12)", color: "rgb(var(--accent))", border: "1px solid rgb(var(--accent) / 0.2)" }}
+        style={{ background: "var(--surface-2)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
       >
         {icon}
       </div>
@@ -448,20 +484,20 @@ function StatCard({ icon, label, end }: { icon: React.ReactNode; label: string; 
   );
 }
 
-/** A group card with letter avatar, counts, code badge + copy, and last-activity. */
 function GroupCard({
   group,
   copied,
   onCopy,
+  onRename,
 }: {
   group: Group;
   copied: boolean;
   onCopy: () => void;
+  onRename: (newName: string) => void;
 }) {
   return (
-    <Link
-      to={`/group/${group.id}/pages`}
-      className="group flex h-full flex-col justify-between gap-4 rounded-2xl p-5 transition-all duration-150 active:scale-[0.995]"
+    <div
+      className="group relative flex items-center justify-between gap-4 rounded-xl p-3 transition-all duration-150 active:scale-[0.995]"
       style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "var(--surface-2)";
@@ -472,17 +508,33 @@ function GroupCard({
         e.currentTarget.style.borderColor = "var(--border)";
       }}
     >
-      <div className="flex items-start justify-between">
+      <Link to={`/group/${group.id}/pages`} className="absolute inset-0 z-0 rounded-xl" />
+
+      <div className="relative z-10 flex items-center gap-4 min-w-0 pointer-events-none">
         <div
-          className="flex h-11 w-11 items-center justify-center rounded-xl text-base font-semibold"
-          style={{
-            background: "rgb(var(--accent) / 0.12)",
-            color: "rgb(var(--accent))",
-            border: "1px solid rgb(var(--accent) / 0.2)",
-          }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold uppercase transition-transform duration-200 group-hover:scale-105"
+          style={{ background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
         >
-          {group.name.slice(0, 1).toUpperCase()}
+          {group.name.charAt(0)}
         </div>
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+            {group.name}
+          </h3>
+          <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: "var(--text-tertiary)" }}>
+            <span>{group.pageCount || 0} pages</span>
+            <span className="h-1 w-1 rounded-full bg-[var(--text-quaternary)]" />
+            <span>{group.memberCount || 0} members</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="relative z-10 flex items-center gap-3 shrink-0">
+        <div className="hidden sm:flex items-center gap-1.5 text-[11px] mr-2" style={{ color: "var(--text-quaternary)" }}>
+          <Clock size={11} />
+          <span>active {group.lastActivity ? formatTimeAgo(new Date(group.lastActivity)) : formatTimeAgo(new Date(group.createdAt))}</span>
+        </div>
+        
         <button
           type="button"
           onClick={(e) => {
@@ -490,9 +542,9 @@ function GroupCard({
             e.stopPropagation();
             onCopy();
           }}
-          title="Copy group code"
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-mono font-medium tracking-wider opacity-0 transition-all group-hover:opacity-100"
-          style={{ background: "var(--surface-3)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }}
+          title="Copy invite code"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-mono font-medium tracking-wider opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--surface-3)]"
+          style={{ background: "var(--surface-2)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }}
         >
           {copied ? (
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
@@ -506,68 +558,39 @@ function GroupCard({
           )}
           {copied ? "Copied" : group.code}
         </button>
-      </div>
 
-      <div>
-        <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-          {group.name}
-        </h3>
-        <div className="mt-1.5 flex items-center gap-2 text-xs" style={{ color: "var(--text-tertiary)" }}>
-          <span>{group.pageCount || 0} pages</span>
-          <span style={{ color: "var(--text-quaternary)" }}>·</span>
-          <span>{group.memberCount || 0} members</span>
-        </div>
-        {group.lastActivity && (
-          <div className="mt-2 flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-quaternary)" }}>
-            <Clock size={10} strokeWidth={2.5} />
-            <span>active {formatTimeAgo(new Date(group.lastActivity))}</span>
-          </div>
-        )}
-      </div>
-    </Link>
-  );
-}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const newName = window.prompt("Enter new group name:", group.name);
+            if (newName && newName !== group.name) {
+              onRename(newName);
+            }
+          }}
+          title="Rename group"
+          className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--surface-3)]"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          <FileEdit size={13} />
+        </button>
 
-function ActionCard({
-  to,
-  title,
-  description,
-  icon,
-}: {
-  to: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <Link
-      to={to}
-      className="group flex flex-col items-start gap-4 rounded-2xl p-6 text-left transition-all duration-150 active:scale-[0.99]"
-      style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--surface-2)";
-        e.currentTarget.style.borderColor = "var(--border-hover)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "var(--surface-1)";
-        e.currentTarget.style.borderColor = "var(--border)";
-      }}
-    >
-      <div
-        className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors duration-150"
-        style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
-      >
-        {icon}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            alert("Delete group functionality coming soon!");
+          }}
+          title="Delete group"
+          className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 transition-all group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          <Trash2 size={13} />
+        </button>
       </div>
-      <div>
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          {title}
-        </h3>
-        <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--text-tertiary)" }}>
-          {description}
-        </p>
-      </div>
-    </Link>
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 import type { MetaFunction, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { redirect, useActionData, useNavigation, Form, useLoaderData } from "react-router";
 import { getUser, getBackendUrl } from "~/lib/auth.server";
+import { PageBackButton } from "~/components/PageBackButton";
 
 export const meta: MetaFunction = () => [{ title: "Join a group · Notes" }];
 
@@ -60,6 +61,10 @@ export default function JoinPage() {
       className="relative flex min-h-screen items-center justify-center overflow-hidden px-6"
       style={{ background: 'var(--bg-primary)' }}
     >
+      <div className="absolute left-6 top-6 z-10 sm:left-8">
+        <PageBackButton />
+      </div>
+
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-[-10%] h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-white/[0.06] blur-[120px]"

@@ -32,12 +32,16 @@ const THEME_OPTIONS = [
   { value: "system" as const, label: "System", Icon: Monitor },
 ];
 
+type ThemeToggleProps = {
+  controlSize?: "compact" | "page";
+};
+
 /**
  * Header pill that opens a small glass POPOVER anchored directly under the
  * button (not a centered modal) — same footprint as a menu, not a dialog.
  * Click outside or Escape closes it.
  */
-function ThemeToggleComponent() {
+function ThemeToggleComponent({ controlSize = "compact" }: ThemeToggleProps = {}) {
   const { mode, setMode, accent, setAccent } = useTheme();
   const [open, setOpen] = useState(false);
   const [entered, setEntered] = useState(false);
@@ -68,6 +72,8 @@ function ThemeToggleComponent() {
   }, [open]);
 
   const ActiveIcon = mode === "dark" ? Moon : mode === "light" ? Sun : Monitor;
+  const isPageControl = controlSize === "page";
+  const iconSize = isPageControl ? 15 : 14;
 
   return (
     <div ref={rootRef} className="relative">
@@ -76,7 +82,9 @@ function ThemeToggleComponent() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="glass-btn inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all duration-150 hover:bg-white/[0.05] active:scale-[0.97]"
+        className={`glass-btn inline-flex items-center rounded-full border font-medium transition-all duration-150 hover:bg-white/[0.05] active:scale-[0.97] ${
+          isPageControl ? "h-9 gap-2 px-3.5 text-sm" : "gap-1.5 px-3.5 py-1.5 text-xs"
+        }`}
         style={{
           borderColor: 'var(--border, rgba(255,255,255,0.1))',
           color: 'var(--text-secondary, rgba(255,255,255,0.7))',
@@ -84,7 +92,7 @@ function ThemeToggleComponent() {
           backdropFilter: 'blur(12px)',
         }}
       >
-        <ActiveIcon size={14} strokeWidth={2} />
+        <ActiveIcon size={iconSize} strokeWidth={2} />
         Theme
       </button>
 

@@ -99,22 +99,28 @@ body {
   height: 100vh;
   position: sticky;
   top: 0;
+  overflow: hidden;
   border-right: 1px solid var(--border);
   background: var(--surface-1);
   backdrop-filter: blur(24px);
-  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  transform: translateX(0);
+  transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width, min-width, opacity, transform;
 }
 
 .note-sidebar--open {
-  margin-left: 0;
+  width: 260px;
+  min-width: 260px;
   opacity: 1;
+  transform: translateX(0);
 }
 
 .note-sidebar--closed {
-  margin-left: -260px;
+  width: 0;
+  min-width: 0;
   opacity: 0;
+  transform: translateX(-18px);
   pointer-events: none;
-  position: absolute;
 }
 
 /* ============================================================

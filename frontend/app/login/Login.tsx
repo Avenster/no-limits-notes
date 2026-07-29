@@ -1,8 +1,8 @@
 import type { MetaFunction, LoaderFunctionArgs } from "react-router";
-import { redirect, useLoaderData, useSearchParams, useNavigate } from "react-router";
-import { ArrowLeft } from "lucide-react";
+import { redirect, useLoaderData, useSearchParams } from "react-router";
 import { getUser, getBackendUrl } from "~/lib/auth.server";
 import { ThemeToggle } from "~/components/ThemeToggle";
+import { PageBackButton } from "~/components/PageBackButton";
 
 export const meta: MetaFunction = () => [{ title: "Log in · Noteblock" }];
 
@@ -22,7 +22,6 @@ export default function LoginPage() {
   const backendUrl = data?.backendUrl ?? "http://localhost:4000";
   const [searchParams] = useSearchParams();
   const error = searchParams.get("error");
-  const navigate = useNavigate();
 
   return (
     <main
@@ -48,21 +47,8 @@ export default function LoginPage() {
 
       {/* Top bar */}
       <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-6 py-6">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label="Go back"
-          className="group flex items-center gap-2 rounded-full px-3.5 py-2 text-sm backdrop-blur-xl transition-colors duration-200"
-          style={{
-            border: "1px solid var(--border)",
-            background: "var(--surface-1)",
-            color: "var(--text-tertiary)",
-          }}
-        >
-          <ArrowLeft size={15} strokeWidth={2} className="transition-transform duration-200 group-hover:-translate-x-0.5" />
-          <span className="hidden sm:inline">Back</span>
-        </button>
-        <ThemeToggle />
+        <PageBackButton />
+        <ThemeToggle controlSize="page" />
       </div>
 
       {/* Card */}

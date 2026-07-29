@@ -1,7 +1,3 @@
-// Server-side helpers for the /group/:groupId/pages backend endpoints.
-// Same rule as auth.server.ts: everything here is server-only, call these
-// only from loader/action, never from a component body.
-
 import { getBackendUrl } from "~/lib/auth.server";
 
 export type PageSummary = {

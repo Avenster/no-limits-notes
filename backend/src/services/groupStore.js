@@ -96,6 +96,13 @@ async function getGroupsByIds(groupIds) {
   });
 }
 
+async function renameGroup(id, newName) {
+  return prisma.group.update({
+    where: { id },
+    data: { name: newName }
+  });
+}
+
 module.exports = {
   findGroupByCode,
   createGroup,
@@ -104,4 +111,5 @@ module.exports = {
   getMembers,
   getGroupsForUser,
   getGroupsByIds,
+  renameGroup,
 };

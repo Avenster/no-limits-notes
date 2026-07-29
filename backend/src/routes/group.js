@@ -157,6 +157,44 @@ router.delete("/:groupId/members/me", async (req, res) => {
     res.status(500).json({ error: "Couldn't leave group." });
   }
 });
+// ============================================================
+// Rename a group
+// ============================================================
+
+router.patch("/:id/rename", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ error: "Name is required." });
+    }
+    
+    // Check permission (must be a member)
+    let membership = null;
+    if (req.user) {
+      membership = await prisma.groupMember.findFirst({
+        where: { groupId: id, userId: req.user.id }
+      });
+    } else {
+      const guestId = req.signedCookies?.[`guest_${id}`];
+      if (guestId) {
+        membership = await prisma.groupMember.findFirst({
+          where: { groupId: id, guestId }
+        });
+      }
+    }
+    
+    if (!membership) {
+      return res.status(403).json({ error: "You don't have permission to rename this group." });
+    }
+    
+    const updated = await groupStore.renameGroup(id, name.trim());
+    res.json({ group: updated });
+  } catch (err) {
+    console.error("PATCH /:id/rename failed:", err);
+    res.status(500).json({ error: "Failed to rename group." });
+  }
+});
 
 // ============================================================
 // Create a group
