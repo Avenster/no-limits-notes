@@ -182,6 +182,37 @@ body {
 
 .bn-editor {
   background: transparent !important;
+}
+
+/* Tone down bright dividers (horizontal rule) in BlockNote */
+.bn-editor hr,
+.bn-editor [data-content-type="divider"] hr,
+.bn-editor [data-content-type="divider"] {
+  border-top-color: var(--border) !important;
+  opacity: 0.6;
+}
+
+/* Add vertical spacing to paragraphs for better readability */
+.bn-editor [data-content-type="paragraph"] {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/* Restored native BlockNote side menu alignment */
+.bn-drag-handle, 
+.bn-add-button {
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.bn-drag-handle svg, .bn-add-button svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.bn-editor {
   color: var(--text-primary) !important;
   padding: 0 !important;
 }
@@ -192,22 +223,7 @@ body {
 }
 
 .bn-editor [data-content-type="codeBlock"] select {
-  position: absolute;
-  top: 8px;
-  right: 44px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  z-index: 10;
-  backdrop-filter: blur(4px);
-}
-.bn-editor [data-content-type="codeBlock"] select:hover {
-  background: rgba(0, 0, 0, 0.6);
-  color: rgba(255, 255, 255, 1);
+  display: none !important;
 }
 
 .bn-editor pre {
@@ -242,6 +258,16 @@ body {
   border: 1px solid rgb(var(--accent) / 0.15) !important;
 }
 
+/* Vivid Highlight.js Syntax Highlighting overrides */
+.hljs-keyword, .hljs-selector-tag, .hljs-subst { color: #ff7b72 !important; font-weight: 600; }
+.hljs-string, .hljs-title.class_, .hljs-section, .hljs-attribute { color: #a5d6ff !important; }
+.hljs-comment, .hljs-quote, .hljs-deletion { color: #8b949e !important; font-style: italic; }
+.hljs-function, .hljs-title, .hljs-title.function_ { color: #d2a8ff !important; }
+.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable { color: #79c0ff !important; }
+.hljs-type, .hljs-class .hljs-title, .hljs-built_in, .hljs-symbol, .hljs-bullet { color: #ffa657 !important; }
+.hljs-meta, .hljs-meta .hljs-keyword { color: #7ee787 !important; }
+.hljs-params { color: #c9d1d9 !important; }
+
 /* Tables */
 .bn-editor table {
   width: 100% !important;
@@ -275,7 +301,6 @@ body {
 }
 
 /* Menus */
-.bn-container .bn-side-menu,
 .bn-container .bn-formatting-toolbar,
 .bn-container .bn-slash-menu,
 .bn-container .bn-link-toolbar,

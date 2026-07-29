@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
 
-type Result = {
+export type SearchItem = {
   id: string;
   title: string;
   subtitle?: string;
@@ -9,18 +9,23 @@ type Result = {
   icon?: "page" | "group" | "action";
 };
 
-export default function CommandPalette() {
+/**
+ * A ⌘K command palette. Self-registers its Cmd/Ctrl+K listener, so mounting it
+ * anywhere is enough to enable the shortcut. Searches client-side over the
+ * `items` prop (e.g. the dashboard's real groups + recent pages) plus a set of
+ * built-in actions — no backend round-trip, no global URL hack.
+ */
+export default function CommandPalette({ items = [] }: { items?: SearchItem[] }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Result[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  // Listen for Cmd+K
+  // Listen for Cmd/Ctrl+K and Escape.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((prev) => !prev);
       }
@@ -30,52 +35,40 @@ export default function CommandPalette() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  // Focus input when opened
+  // Reset + focus when opened.
   useEffect(() => {
     if (open) {
       setQuery("");
-      setResults([]);
       setActiveIndex(0);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
-  // Search
-  const search = useCallback(async (q: string) => {
-    if (!q.trim()) {
-      setResults(getDefaultActions());
-      return;
-    }
-    try {
-      const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
-      // This goes through the frontend proxy - we need a loader for this
-      // Actually let's make a direct backend call
-    } catch {}
+  const defaults = useMemo(() => getDefaultActions(), []);
 
-    // For now, use static actions + client-side filtering
-    const actions = getDefaultActions().filter((a) =>
-      a.title.toLowerCase().includes(q.toLowerCase())
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return defaults;
+    return [...items, ...defaults].filter(
+      (r) =>
+        r.title.toLowerCase().includes(q) ||
+        (r.subtitle?.toLowerCase().includes(q) ?? false)
     );
-    
-    // Search pages via backend
-    try {
-      const backendUrl = window.__BACKEND_URL__ || "";
-      // We can't call backend directly from client. Instead, use a route action.
-      // For simplicity, just filter known pages from the DOM/state
-    } catch {}
-    
-    setResults(actions);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, items]);
 
+  // Keep active index in bounds as results change.
   useEffect(() => {
-    const timer = setTimeout(() => search(query), 150);
-    return () => clearTimeout(timer);
-  }, [query, search]);
+    setActiveIndex((i) => Math.min(i, Math.max(results.length - 1, 0)));
+  }, [results]);
 
-  function select(result: Result) {
-    setOpen(false);
-    navigate(result.href);
-  }
+  const select = useCallback(
+    (result: SearchItem) => {
+      setOpen(false);
+      navigate(result.href);
+    },
+    [navigate]
+  );
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
@@ -92,12 +85,18 @@ export default function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div className="cmd-palette-overlay" onClick={() => setOpen(false)}>
+    <div
+      className="cmd-palette-overlay"
+      onClick={() => setOpen(false)}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
+    >
       <div className="cmd-palette" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
           className="cmd-palette-input"
-          placeholder="Search pages, groups, or actions…"
+          placeholder="Search groups, pages, or actions…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -105,7 +104,7 @@ export default function CommandPalette() {
         <div className="cmd-palette-results">
           {results.length === 0 && query ? (
             <div style={{ padding: "20px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
-              No results for "{query}"
+              No results for “{query}”
             </div>
           ) : results.length === 0 ? (
             <div style={{ padding: "20px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
@@ -123,9 +122,7 @@ export default function CommandPalette() {
                 <PaletteIcon type={r.icon || "page"} />
                 <div>
                   <div className="cmd-palette-item-title">{r.title}</div>
-                  {r.subtitle && (
-                    <div className="cmd-palette-item-subtitle">{r.subtitle}</div>
-                  )}
+                  {r.subtitle && <div className="cmd-palette-item-subtitle">{r.subtitle}</div>}
                 </div>
               </div>
             ))
@@ -141,7 +138,7 @@ export default function CommandPalette() {
   );
 }
 
-function getDefaultActions(): Result[] {
+function getDefaultActions(): SearchItem[] {
   return [
     { id: "action-create", title: "Create a group", subtitle: "Start a new workspace", href: "/create", icon: "action" },
     { id: "action-join", title: "Join a group", subtitle: "Enter a group code", href: "/join", icon: "action" },
