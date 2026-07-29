@@ -100,7 +100,8 @@ function ThemeToggleComponent({ controlSize = "compact" }: ThemeToggleProps = {}
         <div
           role="dialog"
           aria-label="Theme settings"
-          className="absolute right-0 z-50 mt-2 w-72 origin-top-right overflow-hidden rounded-2xl border p-5 backdrop-blur-xl transition-all duration-150 ease-out"
+          // ✅ Increased z-index to z-[100] so it sits above profile dropdowns
+          className="absolute right-0 z-[100] mt-2 w-72 origin-top-right overflow-hidden rounded-2xl border p-5 backdrop-blur-xl transition-all duration-150 ease-out"
           style={{
             boxShadow: "0 24px 48px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05)",
             background: 'color-mix(in srgb, var(--surface-1, #121212) 92%, transparent)',

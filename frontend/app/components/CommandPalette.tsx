@@ -84,24 +84,63 @@ export default function CommandPalette({ items = [] }: { items?: SearchItem[] })
 
   if (!open) return null;
 
+  // ✅ Matching glassmorphism style
+  const glassOverlayStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 60,
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    paddingTop: "15vh",
+    paddingLeft: "1rem",
+    paddingRight: "1rem",
+    background: "rgba(0, 0, 0, 0.6)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+  };
+
+  const glassPanelStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: "36rem",
+    overflow: "hidden",
+    borderRadius: "16px",
+    background: "color-mix(in srgb, var(--surface-1, #121212) 92%, transparent)",
+    backdropFilter: "blur(24px) saturate(180%)",
+    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+    border: "1px solid var(--border, rgba(255,255,255,0.08))",
+    boxShadow: "0 24px 48px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05)",
+  };
+
+  const glassInputStyle: React.CSSProperties = {
+    width: "100%",
+    background: "transparent",
+    border: "none",
+    outline: "none",
+    padding: "16px 20px",
+    fontSize: "15px",
+    color: "var(--text-primary, rgba(255,255,255,0.9))",
+    borderBottom: "1px solid var(--border, rgba(255,255,255,0.08))",
+  };
+
   return (
     <div
-      className="cmd-palette-overlay"
+      style={glassOverlayStyle}
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
     >
-      <div className="cmd-palette" onClick={(e) => e.stopPropagation()}>
+      <div style={glassPanelStyle} onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
-          className="cmd-palette-input"
+          style={glassInputStyle}
           placeholder="Search groups, pages, or actions…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
         />
-        <div className="cmd-palette-results">
+        <div style={{ maxHeight: "400px", overflowY: "auto", padding: "8px" }}>
           {results.length === 0 && query ? (
             <div style={{ padding: "20px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
               No results for “{query}”
@@ -114,24 +153,39 @@ export default function CommandPalette({ items = [] }: { items?: SearchItem[] })
             results.map((r, i) => (
               <div
                 key={r.id}
-                className="cmd-palette-item"
-                data-active={i === activeIndex ? "true" : undefined}
                 onClick={() => select(r)}
                 onMouseEnter={() => setActiveIndex(i)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  color: "var(--text-primary, rgba(255,255,255,0.9))",
+                  background: i === activeIndex ? "rgba(255,255,255,0.05)" : "transparent",
+                  transition: "background 0.1s ease",
+                }}
               >
                 <PaletteIcon type={r.icon || "page"} />
-                <div>
-                  <div className="cmd-palette-item-title">{r.title}</div>
-                  {r.subtitle && <div className="cmd-palette-item-subtitle">{r.subtitle}</div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, truncate: "true", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.title}
+                  </div>
+                  {r.subtitle && (
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary, rgba(255,255,255,0.5))", truncate: "true", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {r.subtitle}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
           )}
         </div>
-        <div style={{ borderTop: "1px solid var(--border)", padding: "8px 16px", display: "flex", gap: 12, justifyContent: "flex-end" }}>
-          <span style={{ fontSize: 11, color: "var(--text-quaternary)" }}>↑↓ Navigate</span>
-          <span style={{ fontSize: 11, color: "var(--text-quaternary)" }}>↵ Open</span>
-          <span style={{ fontSize: 11, color: "var(--text-quaternary)" }}>esc Close</span>
+        <div style={{ borderTop: "1px solid var(--border, rgba(255,255,255,0.08))", padding: "8px 16px", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <span style={{ fontSize: 11, color: "var(--text-quaternary, rgba(255,255,255,0.3))" }}>↑↓ Navigate</span>
+          <span style={{ fontSize: 11, color: "var(--text-quaternary, rgba(255,255,255,0.3))" }}>↵ Open</span>
+          <span style={{ fontSize: 11, color: "var(--text-quaternary, rgba(255,255,255,0.3))" }}>esc Close</span>
         </div>
       </div>
     </div>

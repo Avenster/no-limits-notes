@@ -1,15 +1,19 @@
 import type { MetaFunction, LoaderFunctionArgs } from "react-router";
 import { redirect, useLoaderData, Link, Await, useRevalidator } from "react-router";
 import { getUser, getBackendUrl } from "~/lib/auth.server";
-import { useState, useMemo, Suspense } from "react";
-import { FileEdit, Activity, Clock, Users, FileText, Zap } from "lucide-react";
+import { useState, useMemo, Suspense, useRef, useEffect } from "react";
+import { FileEdit, Activity, Clock, Users, FileText, Zap, Settings, LogOut } from "lucide-react";
 import { Reveal } from "~/hooks/useScrollReveal";
 import { useCountUp } from "~/hooks/useCountUp";
 import CommandPalette, { type SearchItem } from "~/components/CommandPalette";
-import { PlusIcon, ArrowRightIcon } from "~/components/icons";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { ThemeToggle } from "~/components/ThemeToggle";
-import { Skeleton, SkeletonCard } from "~/components/ui/Skeleton";
+import { Skeleton } from "~/components/ui/Skeleton";
+import { CreateGroupModal } from "~/components/CreateGroupModal";
+import { JoinGroupModal } from "~/components/JoinGroupModal";
+import { RenameGroupModal } from "~/components/RenameGroupModal";
+import { DeleteGroupModal } from "~/components/DeleteGroupModal";
+
 export const meta: MetaFunction = () => [{ title: "Notes" }];
 
 type Group = {
@@ -37,27 +41,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const backendUrl = getBackendUrl();
   const cookie = request.headers.get("Cookie") || "";
 
-  // Synchronous redirect for unauthenticated users without guest cookies
   if (!user && !cookie.includes("guest_")) return redirect("/login");
 
   const groupsPromise = fetch(`${backendUrl}/group/my-groups`, {
     headers: cookie ? { Cookie: cookie } : undefined,
-  }).then(async (res) => {
-    if (!res.ok) throw new Error("Failed to fetch groups");
-    const data = await res.json();
-    return data.groups || [];
-  }).catch((err) => {
-    console.error("Failed to fetch groups:", err);
-    return [];
-  });
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error("Failed to fetch groups");
+      const data = await res.json();
+      return data.groups || [];
+    })
+    .catch((err) => {
+      console.error("Failed to fetch groups:", err);
+      return [];
+    });
 
   const activityPromise = fetch(`${backendUrl}/activity/recent`, {
     headers: cookie ? { Cookie: cookie } : undefined,
-  }).then(async (res) => {
-    if (!res.ok) throw new Error("Failed to fetch activity");
-    const actData = await res.json();
-    return actData.activity || [];
-  }).catch(() => []);
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error("Failed to fetch activity");
+      const actData = await res.json();
+      return actData.activity || [];
+    })
+    .catch(() => []);
 
   return { user, backendUrl, groups: groupsPromise, activity: activityPromise };
 }
@@ -69,9 +76,35 @@ function greeting() {
   return "Good evening";
 }
 
+const glassPanelStyle = {
+  background: 'color-mix(in srgb, var(--surface-1, #121212) 92%, transparent)',
+  backdropFilter: 'blur(24px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+  border: '1px solid var(--border, rgba(255,255,255,0.08))',
+  boxShadow: '0 24px 48px -16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05)',
+};
+
 export default function HomePage() {
   const { user, backendUrl, groups, activity } = useLoaderData<typeof loader>();
+  const revalidator = useRevalidator();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Group | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
+  
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <main
@@ -82,15 +115,26 @@ export default function HomePage() {
       <div
         aria-hidden
         className="pointer-events-none fixed left-1/2 top-[-15%] h-[520px] w-[520px] -translate-x-1/2 rounded-full opacity-40 blur-[140px]"
-        style={{ background: "linear-gradient(135deg, rgb(var(--accent) / 0.15), rgb(var(--accent-light) / 0.08))" }}
+        style={{
+          background:
+            "linear-gradient(135deg, rgb(var(--accent) / 0.15), rgb(var(--accent-light) / 0.08))",
+        }}
       />
 
       {/* ── Header ── */}
       <header
-        style={{ borderBottom: "1px solid var(--border)", background: "rgb(var(--bg-secondary) / 0.6)", backdropFilter: "blur(12px)" }}
+        style={{
+          borderBottom: "1px solid var(--border)",
+          background: "rgb(var(--bg-secondary) / 0.6)",
+          backdropFilter: "blur(12px)",
+        }}
         className="shrink-0 sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 sm:px-8"
       >
-        <Link to="/home" className="flex items-center gap-2.5 no-underline" style={{ color: "var(--text-primary)" }}>
+        <Link
+          to="/home"
+          className="flex items-center gap-2.5 no-underline"
+          style={{ color: "var(--text-primary)" }}
+        >
           <NoteblockMark />
           <span className="text-[15px] font-bold tracking-[-0.3px]">Noteblock</span>
         </Link>
@@ -98,9 +142,17 @@ export default function HomePage() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            onClick={() =>
+              document.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "k", metaKey: true })
+              )
+            }
             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors"
-            style={{ background: "var(--surface-2)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }}
+            style={{
+              background: "var(--surface-2)",
+              color: "var(--text-tertiary)",
+              border: "1px solid var(--border)",
+            }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
             title="Search (⌘K)"
@@ -111,7 +163,7 @@ export default function HomePage() {
           <ThemeToggle />
 
           {user ? (
-            <div className="relative">
+            <div ref={profileRef} className="relative">
               <button
                 type="button"
                 onClick={() => setProfileOpen(!profileOpen)}
@@ -123,36 +175,38 @@ export default function HomePage() {
                 ) : (
                   <div
                     className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold"
-                    style={{ background: "var(--surface-3)", color: "var(--text-secondary)" }}
+                    style={{
+                      background: "var(--surface-3)",
+                      color: "var(--text-secondary)",
+                    }}
                   >
                     {user.name.slice(0, 1).toUpperCase()}
                   </div>
                 )}
-                <span className="max-w-[120px] truncate text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span
+                  className="max-w-[120px] truncate text-xs"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {user.name}
                 </span>
               </button>
 
               {profileOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
-                  <div
-                    className="absolute right-0 mt-2 w-48 rounded-xl border p-1 shadow-lg z-50 backdrop-blur-xl"
-                    style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+                <div
+                  className="absolute right-0 mt-2 w-52 rounded-2xl p-1.5 z-50"
+                  style={glassPanelStyle}
+                >
+                  <Link
+                    to="/profile"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                    style={{ color: "var(--text-primary)" }}
                   >
-                    <Link
-                      to="/profile"
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors"
-                      style={{ color: "var(--text-primary)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      Profile settings
-                    </Link>
-                    <div className="my-1 h-px w-full" style={{ background: "var(--border)" }} />
-                    <LogoutButton backendUrl={backendUrl} />
-                  </div>
-                </>
+                    <Settings size={14} style={{ color: "var(--text-tertiary)" }} />
+                    Profile settings
+                  </Link>
+                  <div className="my-1 h-px w-full" style={{ background: "var(--border)" }} />
+                  <LogoutButton backendUrl={backendUrl} />
+                </div>
               )}
             </div>
           ) : (
@@ -168,75 +222,169 @@ export default function HomePage() {
       </header>
 
       <Suspense fallback={<DashboardSkeleton />}>
-        <Await resolve={Promise.all([groups, activity])}>
-          {([resolvedGroups, resolvedActivity]) => (
-            <DashboardContent user={user} backendUrl={backendUrl} groups={resolvedGroups} activity={resolvedActivity} />
+        <Await resolve={groups}>
+          {(resolvedGroups) => (
+            <Await resolve={activity}>
+              {(resolvedActivity) => (
+                <DashboardContent
+                  user={user}
+                  backendUrl={backendUrl}
+                  groups={resolvedGroups}
+                  activity={resolvedActivity}
+                  onCreateOpen={() => setCreateOpen(true)}
+                  onJoinOpen={() => setJoinOpen(true)}
+                  onRenameOpen={(group) => setRenameTarget(group)}
+                  onDeleteOpen={(group) => setDeleteTarget(group)}
+                />
+              )}
+            </Await>
           )}
         </Await>
       </Suspense>
+
+      {/* ── Modals ── */}
+      {createOpen && (
+        <CreateGroupModal
+          user={user}
+          backendUrl={backendUrl}
+          onClose={() => setCreateOpen(false)}
+          onSuccess={() => revalidator.revalidate()}
+        />
+      )}
+      {joinOpen && (
+        <JoinGroupModal
+          user={user}
+          backendUrl={backendUrl}
+          onClose={() => setJoinOpen(false)}
+          onSuccess={() => revalidator.revalidate()}
+        />
+      )}
+      {renameTarget && (
+        <RenameGroupModal
+          group={renameTarget}
+          backendUrl={backendUrl}
+          onClose={() => setRenameTarget(null)}
+          onSuccess={() => revalidator.revalidate()}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteGroupModal
+          group={deleteTarget}
+          backendUrl={backendUrl}
+          onClose={() => setDeleteTarget(null)}
+          onSuccess={() => revalidator.revalidate()}
+        />
+      )}
     </main>
   );
 }
 
 function DashboardSkeleton() {
+  const cardStyle = {
+    background: "var(--surface-1)",
+    border: "1px solid var(--border)",
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto px-6 pb-20 pt-8 sm:px-8 custom-scrollbar">
-      <div className="mx-auto max-w-6xl space-y-12 pt-6">
-        <div className="space-y-4">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-5 w-48" />
-        </div>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-        <div className="grid gap-12 lg:grid-cols-3 pt-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex justify-between items-center">
-               <Skeleton className="h-6 w-32" />
-               <Skeleton className="h-6 w-20 rounded-full" />
-            </div>
-            <div className="space-y-3">
-              <Skeleton className="h-[72px] w-full rounded-xl" />
-              <Skeleton className="h-[72px] w-full rounded-xl" />
-              <Skeleton className="h-[72px] w-full rounded-xl" />
-            </div>
-          </div>
-          <div className="lg:col-span-1 space-y-4">
-             <Skeleton className="h-6 w-32" />
-             <Skeleton className="h-[300px] w-full rounded-xl" />
+    <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <section className="shrink-0 relative z-10 mx-auto w-full max-w-6xl px-6 pt-14 pb-2 sm:px-8">
+        <div className="relative space-y-3">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-9 w-72" />
+          <Skeleton className="h-4 w-52" />
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex flex-col gap-2 rounded-2xl p-4" style={cardStyle}>
+                <Skeleton className="h-7 w-7 rounded-lg" />
+                <Skeleton className="h-6 w-12" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
+
+      <section className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-8 pt-10 sm:px-8 flex-1 min-h-0 flex flex-col">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 flex-1 min-h-0">
+          <div className="lg:col-span-2 flex flex-col min-h-0">
+            <div className="mb-4 flex items-center justify-between shrink-0">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-6 w-24 rounded-full" />
+            </div>
+            <div className="flex-1 space-y-2 overflow-hidden">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-4 rounded-xl p-3" style={cardStyle}>
+                  <Skeleton className="h-11 w-11 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-1/4" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                  <Skeleton className="h-7 w-20 rounded-md hidden sm:block" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="lg:col-span-1 flex flex-col min-h-0">
+            <div className="mb-4 flex items-center justify-between shrink-0">
+              <Skeleton className="h-4 w-28" />
+            </div>
+            <div className="flex-1 rounded-xl p-1.5 space-y-1 overflow-hidden" style={cardStyle}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-start gap-3 rounded-lg px-3 py-2.5">
+                  <Skeleton className="h-7 w-7 rounded-md shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-2.5 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 
-function DashboardContent({ user, backendUrl, groups, activity }: { user: any, backendUrl: string, groups: Group[], activity: ActivityItem[] }) {
+function DashboardContent({
+  user,
+  backendUrl,
+  groups,
+  activity,
+  onCreateOpen,
+  onJoinOpen,
+  onRenameOpen,
+  onDeleteOpen,
+}: {
+  user: any;
+  backendUrl: string;
+  groups: Group[];
+  activity: ActivityItem[];
+  onCreateOpen: () => void;
+  onJoinOpen: () => void;
+  onRenameOpen: (group: Group) => void;
+  onDeleteOpen: (group: Group) => void;
+}) {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const revalidator = useRevalidator();
   const firstName = user?.name.split(" ")[0] || "";
 
-  // Dynamic stats derived from real loader data (never hardcoded).
   const stats = useMemo(() => {
     const totalPages = groups.reduce((s, g) => s + (g.pageCount || 0), 0);
     const totalMembers = groups.reduce((s, g) => s + (g.memberCount || 0), 0);
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const editsThisWeek = activity.filter((a) => new Date(a.createdAt).getTime() > weekAgo).length;
+    const editsThisWeek = activity.filter(
+      (a) => new Date(a.createdAt).getTime() > weekAgo
+    ).length;
     return { groups: groups.length, totalPages, totalMembers, editsThisWeek };
   }, [groups, activity]);
 
-  // Command palette gets real, dynamic items: groups + recently touched pages.
   const paletteItems: SearchItem[] = useMemo(() => {
     const groupItems: SearchItem[] = groups.map((g) => ({
       id: `group-${g.id}`,
       title: g.name,
       subtitle: `${g.pageCount || 0} pages · ${g.memberCount || 0} members`,
       href: `/group/${g.id}/pages`,
-      icon: "group",
+      icon: "group" as const,
     }));
     const seenPages = new Set<string>();
     const pageItems: SearchItem[] = activity
@@ -251,21 +399,23 @@ function DashboardContent({ user, backendUrl, groups, activity }: { user: any, b
         title: a.pageTitle,
         subtitle: a.groupName,
         href: `/group/${a.groupId}/pages/${a.pageId}`,
-        icon: "page",
+        icon: "page" as const,
       }));
     return [...groupItems, ...pageItems];
   }, [groups, activity]);
 
-  // Group repetitive activities by the same user on the same page.
-  const groupedActivity = activity.reduce((acc, curr) => {
-    const last = acc[acc.length - 1];
-    if (last && last.pageId === curr.pageId && last.editedByName === curr.editedByName) {
-      last.count = (last.count || 1) + 1;
-    } else {
-      acc.push({ ...curr, count: 1 });
-    }
-    return acc;
-  }, [] as (ActivityItem & { count?: number })[]);
+  const groupedActivity = activity.reduce(
+    (acc, curr) => {
+      const last = acc[acc.length - 1];
+      if (last && last.pageId === curr.pageId && last.editedByName === curr.editedByName) {
+        last.count = (last.count || 1) + 1;
+      } else {
+        acc.push({ ...curr, count: 1 });
+      }
+      return acc;
+    },
+    [] as (ActivityItem & { count?: number })[]
+  );
 
   function copyCode(code: string) {
     navigator.clipboard.writeText(code);
@@ -278,15 +428,19 @@ function DashboardContent({ user, backendUrl, groups, activity }: { user: any, b
       <CommandPalette items={paletteItems} />
 
       {/* ── Hero with spotlight + dynamic stats ── */}
-      <section
-        className="shrink-0 relative z-10 mx-auto w-full max-w-6xl px-6 pt-14 pb-2 sm:px-8"
-      >
+      <section className="shrink-0 relative z-10 mx-auto w-full max-w-6xl px-6 pt-14 pb-2 sm:px-8">
         <div className="relative">
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em]" style={{ color: "rgb(var(--accent))" }}>
+            <p
+              className="mb-2 text-xs font-medium uppercase tracking-[0.18em]"
+              style={{ color: "rgb(var(--accent))" }}
+            >
               {greeting()}
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl" style={{ color: "var(--text-primary)" }}>
+            <h1
+              className="text-3xl font-semibold tracking-tight sm:text-4xl"
+              style={{ color: "var(--text-primary)" }}
+            >
               {firstName ? `Welcome back, ${firstName}.` : "Welcome."}
             </h1>
             <p className="mt-2 text-sm" style={{ color: "var(--text-tertiary)" }}>
@@ -294,13 +448,16 @@ function DashboardContent({ user, backendUrl, groups, activity }: { user: any, b
             </p>
           </div>
 
-          {/* Dynamic count-up stats */}
           <div>
             <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <StatCard icon={<FileText size={15} />} label="Groups" end={stats.groups} />
               <StatCard icon={<FileEdit size={15} />} label="Pages" end={stats.totalPages} />
               <StatCard icon={<Users size={15} />} label="Members" end={stats.totalMembers} />
-              <StatCard icon={<Zap size={15} />} label="Edits / week" end={stats.editsThisWeek} />
+              <StatCard
+                icon={<Zap size={15} />}
+                label="Edits / week"
+                end={stats.editsThisWeek}
+              />
             </div>
           </div>
         </div>
@@ -310,37 +467,60 @@ function DashboardContent({ user, backendUrl, groups, activity }: { user: any, b
       <section className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-8 pt-10 sm:px-8 flex-1 min-h-0 flex flex-col">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 flex-1 min-h-0">
           {/* Left column — 2/3 */}
-          <div className="flex flex-col gap-8 lg:col-span-2 overflow-y-auto custom-scrollbar p-2 -m-2">
-            {/* Groups list */}
-            <Reveal>
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
-                    Your Groups
-                  </h2>
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: "var(--surface-1)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>
-                    {stats.groups}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Link
-                    to="/join"
-                    className="group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-all duration-150 active:scale-95 hover:bg-[var(--surface-1)]"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-primary)]" />
-                    <span className="text-xs font-medium group-hover:text-[var(--text-primary)]">Join</span>
-                  </Link>
-                  <Link
-                    to="/create"
-                    className="group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-all duration-150 active:scale-95 hover:bg-[var(--surface-1)]"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    <Plus size={13} className="transition-transform group-hover:scale-110 group-hover:text-[var(--text-primary)]" />
-                    <span className="text-xs font-medium group-hover:text-[var(--text-primary)]">Create</span>
-                  </Link>
-                </div>
+          <div className="lg:col-span-2 flex flex-col min-h-0">
+            <div className="mb-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <h2
+                  className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
+                  Your Groups
+                </h2>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{
+                    background: "var(--surface-1)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  {stats.groups}
+                </span>
               </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onJoinOpen}
+                  className="group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-all duration-150 active:scale-95 hover:bg-[var(--surface-1)]"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <ArrowRight
+                    size={13}
+                    className="transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-primary)]"
+                  />
+                  <span className="text-xs font-medium group-hover:text-[var(--text-primary)]">
+                    Join
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onCreateOpen}
+                  className="group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-all duration-150 active:scale-95 hover:bg-[var(--surface-1)]"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <Plus
+                    size={13}
+                    className="transition-transform group-hover:scale-110 group-hover:text-[var(--text-primary)]"
+                  />
+                  <span className="text-xs font-medium group-hover:text-[var(--text-primary)]">
+                    Create
+                  </span>
+                </button>
+              </div>
+            </div>
+            
+            {/* Scrollable Groups List */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2">
               {groups.length > 0 ? (
                 <div className="flex flex-col gap-2">
                   {groups.map((group, i) => (
@@ -349,13 +529,15 @@ function DashboardContent({ user, backendUrl, groups, activity }: { user: any, b
                         group={group}
                         copied={copiedCode === group.code}
                         onCopy={() => copyCode(group.code)}
+                        onRenameClick={() => onRenameOpen(group)}
+                        onDeleteClick={() => onDeleteOpen(group)}
                       />
                     </Reveal>
                   ))}
                 </div>
               ) : (
                 <div
-                  className="rounded-2xl p-10 text-center"
+                  className="rounded-2xl p-10 text-center mt-12"
                   style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
                 >
                   <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>
@@ -363,83 +545,100 @@ function DashboardContent({ user, backendUrl, groups, activity }: { user: any, b
                   </p>
                 </div>
               )}
-            </Reveal>
+            </div>
           </div>
 
           {/* Right column — 1/3 — Activity feed */}
-          <div className="lg:col-span-1 relative">
-            <div className="lg:absolute lg:inset-0 flex flex-col">
-              <Reveal>
-                <div className="mb-4 flex items-center justify-between shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
-                    Recent activity
-                  </h2>
-                  <Activity size={14} style={{ color: "var(--text-quaternary)" }} />
-                </div>
-              </Reveal>
-
-              {groupedActivity.length > 0 ? (
-                <div
-                  className="flex flex-col gap-0.5 rounded-xl p-1.5 overflow-y-auto custom-scrollbar lg:flex-1"
-                  style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
-                >
-                  {groupedActivity.slice(0, 8).map((a, i) => (
-                    <div key={a.id}>
-                      <Link
-                        to={`/group/${a.groupId}/pages/${a.pageId}`}
-                        className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-200"
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                      >
-                        <div
-                          className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors"
-                          style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                        >
-                          <FileEdit size={12} strokeWidth={2.5} />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className="truncate text-[13px] font-semibold leading-tight transition-colors group-hover:text-[var(--accent)]"
-                            style={{ color: "var(--text-primary)" }}
-                          >
-                            {a.pageTitle}
-                          </p>
-                          <p className="mt-1 truncate text-[12px]" style={{ color: "var(--text-tertiary)" }}>
-                            <span className="font-medium" style={{ color: "var(--text-secondary)" }}>
-                              {a.editedByName}
-                            </span>
-                            {a.count && a.count > 1 ? ` · ${a.count} edits` : " edited"}
-                          </p>
-                          <div
-                            className="mt-1.5 flex items-center gap-1.5 text-[10.5px] font-medium"
-                            style={{ color: "var(--text-quaternary)" }}
-                          >
-                            <Clock size={10} strokeWidth={2.5} />
-                            <span>{formatTimeAgo(new Date(a.createdAt))}</span>
-                            <span>·</span>
-                            <span className="truncate">{a.groupName}</span>
-                          </div>
-                        </div>
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className="flex flex-col items-center justify-center rounded-xl p-8 text-center"
-                  style={{ border: "1px dashed var(--border)", background: "transparent" }}
-                >
-                  <Activity size={24} className="mb-3 opacity-20" style={{ color: "var(--text-secondary)" }} />
-                  <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                    No activity
-                  </p>
-                  <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
-                    Updates will appear here.
-                  </p>
-                </div>
-              )}
+          <div className="lg:col-span-1 flex flex-col min-h-0">
+            <div className="mb-4 flex items-center justify-between shrink-0">
+              <h2
+                className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                Recent activity
+              </h2>
+              <Activity size={14} style={{ color: "var(--text-quaternary)" }} />
             </div>
+
+            {groupedActivity.length > 0 ? (
+              <div
+                className="flex flex-col gap-0.5 rounded-xl p-1.5 overflow-y-auto custom-scrollbar flex-1"
+                style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+              >
+                {groupedActivity.slice(0, 8).map((a) => (
+                  <div key={a.id}>
+                    <Link
+                      to={`/group/${a.groupId}/pages/${a.pageId}`}
+                      className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-200"
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "var(--surface-2)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "transparent")
+                      }
+                    >
+                      <div
+                        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors"
+                        style={{
+                          background: "var(--bg-primary)",
+                          borderColor: "var(--border)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        <FileEdit size={12} strokeWidth={2.5} />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className="truncate text-[13px] font-semibold leading-tight transition-colors group-hover:text-[var(--accent)]"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {a.pageTitle}
+                        </p>
+                        <p
+                          className="mt-1 truncate text-[12px]"
+                          style={{ color: "var(--text-tertiary)" }}
+                        >
+                          <span
+                            className="font-medium"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            {a.editedByName}
+                          </span>
+                          {a.count && a.count > 1 ? ` · ${a.count} edits` : " edited"}
+                        </p>
+                        <div
+                          className="mt-1.5 flex items-center gap-1.5 text-[10.5px] font-medium"
+                          style={{ color: "var(--text-quaternary)" }}
+                        >
+                          <Clock size={10} strokeWidth={2.5} />
+                          <span>{formatTimeAgo(new Date(a.createdAt))}</span>
+                          <span>·</span>
+                          <span className="truncate">{a.groupName}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="flex flex-col items-center justify-center rounded-xl p-8 text-center flex-1"
+                style={{ border: "1px dashed var(--border)", background: "transparent" }}
+              >
+                <Activity
+                  size={24}
+                  className="mb-3 opacity-20"
+                  style={{ color: "var(--text-secondary)" }}
+                />
+                <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                  No activity
+                </p>
+                <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                  Updates will appear here.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -458,8 +657,15 @@ function NoteblockMark() {
   );
 }
 
-/** A single count-up stat tile. */
-function StatCard({ icon, label, end }: { icon: React.ReactNode; label: string; end: number }) {
+function StatCard({
+  icon,
+  label,
+  end,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  end: number;
+}) {
   const { ref, value } = useCountUp<HTMLDivElement>(end, { duration: 1100 });
   return (
     <div
@@ -468,12 +674,20 @@ function StatCard({ icon, label, end }: { icon: React.ReactNode; label: string; 
     >
       <div
         className="flex h-7 w-7 items-center justify-center rounded-lg"
-        style={{ background: "var(--surface-2)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+        style={{
+          background: "var(--surface-2)",
+          color: "var(--text-secondary)",
+          border: "1px solid var(--border)",
+        }}
       >
         {icon}
       </div>
       <div>
-        <div ref={ref} className="text-2xl font-semibold tabular-nums" style={{ color: "var(--text-primary)" }}>
+        <div
+          ref={ref}
+          className="text-2xl font-semibold tabular-nums"
+          style={{ color: "var(--text-primary)" }}
+        >
           {value}
         </div>
         <div className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
@@ -488,12 +702,14 @@ function GroupCard({
   group,
   copied,
   onCopy,
-  onRename,
+  onRenameClick,
+  onDeleteClick,
 }: {
   group: Group;
   copied: boolean;
   onCopy: () => void;
-  onRename: (newName: string) => void;
+  onRenameClick: () => void;
+  onDeleteClick: () => void;
 }) {
   return (
     <div
@@ -513,7 +729,11 @@ function GroupCard({
       <div className="relative z-10 flex items-center gap-4 min-w-0 pointer-events-none">
         <div
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold uppercase transition-transform duration-200 group-hover:scale-105"
-          style={{ background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+          style={{
+            background: "var(--surface-2)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border)",
+          }}
         >
           {group.name.charAt(0)}
         </div>
@@ -521,20 +741,31 @@ function GroupCard({
           <h3 className="truncate text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
             {group.name}
           </h3>
-          <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: "var(--text-tertiary)" }}>
+          <div
+            className="mt-1 flex items-center gap-2 text-xs"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             <span>{group.pageCount || 0} pages</span>
             <span className="h-1 w-1 rounded-full bg-[var(--text-quaternary)]" />
             <span>{group.memberCount || 0} members</span>
           </div>
         </div>
       </div>
-      
+
       <div className="relative z-10 flex items-center gap-3 shrink-0">
-        <div className="hidden sm:flex items-center gap-1.5 text-[11px] mr-2" style={{ color: "var(--text-quaternary)" }}>
+        <div
+          className="hidden sm:flex items-center gap-1.5 text-[11px] mr-2"
+          style={{ color: "var(--text-quaternary)" }}
+        >
           <Clock size={11} />
-          <span>active {group.lastActivity ? formatTimeAgo(new Date(group.lastActivity)) : formatTimeAgo(new Date(group.createdAt))}</span>
+          <span>
+            active{" "}
+            {group.lastActivity
+              ? formatTimeAgo(new Date(group.lastActivity))
+              : formatTimeAgo(new Date(group.createdAt))}
+          </span>
         </div>
-        
+
         <button
           type="button"
           onClick={(e) => {
@@ -544,16 +775,39 @@ function GroupCard({
           }}
           title="Copy invite code"
           className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-mono font-medium tracking-wider opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--surface-3)]"
-          style={{ background: "var(--surface-2)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }}
+          style={{
+            background: "var(--surface-2)",
+            color: "var(--text-tertiary)",
+            border: "1px solid var(--border)",
+          }}
         >
           {copied ? (
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
-              <path d="M4 8.5l3 3 5-6" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M4 8.5l3 3 5-6"
+                stroke="#10b981"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           ) : (
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M6 13h5.5a1.5 1.5 0 001.5-1.5V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <rect
+                x="3"
+                y="3"
+                width="7"
+                height="7"
+                rx="1.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M6 13h5.5a1.5 1.5 0 001.5-1.5V6"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
             </svg>
           )}
           {copied ? "Copied" : group.code}
@@ -564,10 +818,7 @@ function GroupCard({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const newName = window.prompt("Enter new group name:", group.name);
-            if (newName && newName !== group.name) {
-              onRename(newName);
-            }
+            onRenameClick();
           }}
           title="Rename group"
           className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--surface-3)]"
@@ -581,7 +832,7 @@ function GroupCard({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            alert("Delete group functionality coming soon!");
+            onDeleteClick();
           }}
           title="Delete group"
           className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 transition-all group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500"
@@ -605,11 +856,10 @@ function LogoutButton({ backendUrl }: { backendUrl: string }) {
         });
         window.location.href = "/login";
       }}
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors"
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5"
       style={{ color: "var(--text-primary)" }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
+      <LogOut size={14} style={{ color: "var(--text-tertiary)" }} />
       Sign out
     </button>
   );

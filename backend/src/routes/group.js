@@ -157,6 +157,7 @@ router.delete("/:groupId/members/me", async (req, res) => {
     res.status(500).json({ error: "Couldn't leave group." });
   }
 });
+
 // ============================================================
 // Rename a group
 // ============================================================
@@ -169,7 +170,6 @@ router.patch("/:id/rename", async (req, res) => {
       return res.status(400).json({ error: "Name is required." });
     }
     
-    // Check permission (must be a member)
     let membership = null;
     if (req.user) {
       membership = await prisma.groupMember.findFirst({
@@ -197,9 +197,58 @@ router.patch("/:id/rename", async (req, res) => {
 });
 
 // ============================================================
+// Delete a group (Owner only)
+// ============================================================
+
+router.delete("/:groupId", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+
+    // 1. Identify the user/guest and check permissions
+    let membership = null;
+    if (req.user) {
+      membership = await prisma.groupMember.findFirst({
+        where: { groupId, userId: req.user.id },
+      });
+    } else {
+      const guestId = req.signedCookies?.[getGuestCookieName(groupId)];
+      if (guestId) {
+        membership = await prisma.groupMember.findFirst({
+          where: { groupId, guestId },
+        });
+      }
+    }
+
+    if (!membership) {
+      return res.status(403).json({ error: "You don't have permission to delete this group." });
+    }
+
+    if (membership.role !== "owner") {
+      return res.status(403).json({ error: "Only the owner can delete this group." });
+    }
+
+    // 2. Delete the group. 
+    // Prisma schema handles cascading deletes automatically for:
+    // -> GroupMember
+    // -> Page (which further cascades to Revision & Favorite)
+    await prisma.group.delete({
+      where: { id: groupId },
+    });
+
+    // 3. Clear the guest cookie if a guest deleted it
+    if (!req.user) {
+      res.clearCookie(getGuestCookieName(groupId));
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /group/:groupId failed:", err);
+    res.status(500).json({ error: "Couldn't delete the group." });
+  }
+});
+
+// ============================================================
 // Create a group
-// Works for both logged-in users and anonymous guests. The creator
-// becomes the "owner" member right away.
 // ============================================================
 
 router.post("/create", async (req, res) => {
@@ -254,8 +303,6 @@ router.post("/create", async (req, res) => {
 
 // ============================================================
 // Join a group by code
-// Works for both logged-in users (req.user set by Passport) and
-// anonymous guests (displayName provided, no account).
 // ============================================================
 
 router.post("/join", async (req, res) => {
