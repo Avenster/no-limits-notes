@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
@@ -88,6 +88,11 @@ type Props = {
   editable?: boolean;
 };
 
+function getHeadingText(block: any): string {
+  if (!block.content || !Array.isArray(block.content)) return "Untitled";
+  return block.content.map((c: any) => c.text || "").join("");
+}
+
 export default function NoteEditor({ initialContent, onChange, editable = true }: Props) {
   const codeHighlightExtension = useMemo(
     () =>
@@ -108,9 +113,9 @@ export default function NoteEditor({ initialContent, onChange, editable = true }
       initialContent && initialContent.length > 0 ? initialContent : undefined,
     extensions: [codeHighlightExtension],
   });
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
   useEffect(() => {
     const check = () => {
@@ -123,29 +128,85 @@ export default function NoteEditor({ initialContent, onChange, editable = true }
     return () => obs.disconnect();
   }, []);
 
-  // Overlay state for copy button and language selector
-  const [hoveredBlock, setHoveredBlock] = useState<{ top: number; right: number; text: string; id: string; language: string; selectEl: HTMLSelectElement | null } | null>(null);
+  // ── Table of Contents state ──
+  const [showToc, setShowToc] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [documentBlocks, setDocumentBlocks] = useState<Block[]>(initialContent || []);
+  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
+
+  const headings = useMemo(() => {
+    return documentBlocks
+      .filter((block: any) => block.type === "heading")
+      .map((block: any) => ({
+        id: block.id,
+        text: getHeadingText(block),
+        level: block.props?.level || 1,
+      }));
+  }, [documentBlocks]);
+
+  // Scroll spy: track which heading is currently in view
+  useEffect(() => {
+    if (!showToc || headings.length === 0) return;
+
+    const updateActive = () => {
+      const offset = window.scrollY + 120;
+      let active: string | null = null;
+
+      for (let i = headings.length - 1; i >= 0; i--) {
+        const el = document.querySelector(`[data-id="${headings[i].id}"]`);
+        if (el) {
+          const top = (el as HTMLElement).offsetTop;
+          if (top <= offset) {
+            active = headings[i].id;
+            break;
+          }
+        }
+      }
+      if (!active) active = headings[0]?.id || null;
+      setActiveHeadingId(active);
+    };
+
+    window.addEventListener("scroll", updateActive, { passive: true });
+    updateActive();
+    return () => window.removeEventListener("scroll", updateActive);
+  }, [showToc, headings]);
+
+  const scrollToHeading = useCallback((id: string) => {
+    const el = document.querySelector(`[data-id="${id}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    setShowMenu(false);
+  }, []);
+
+  // ── Existing overlay state ──
+  const [hoveredBlock, setHoveredBlock] = useState<{
+    top: number;
+    right: number;
+    text: string;
+    id: string;
+    language: string;
+    selectEl: HTMLSelectElement | null;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState<boolean>(false);
   const [searchLang, setSearchLang] = useState("");
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      // Don't update hover states if the language menu is open
-      if (document.querySelector('.lang-menu')) return;
-
+      if (document.querySelector(".lang-menu")) return;
       if (!containerRef.current) return;
       const target = e.target as HTMLElement;
       const codeBlock = target.closest("div[data-content-type='codeBlock']") as HTMLElement;
-      
+
       if (codeBlock) {
         const rect = codeBlock.getBoundingClientRect();
         const containerRect = containerRef.current.getBoundingClientRect();
-        
+
         const blockWithId = codeBlock.closest("[data-id]");
         const blockId = blockWithId ? blockWithId.getAttribute("data-id") || "" : "";
         const selectEl = codeBlock.querySelector("select");
-        
+
         let language = "text";
         if (blockId) {
           const block = editor.getBlock(blockId);
@@ -154,21 +215,19 @@ export default function NoteEditor({ initialContent, onChange, editable = true }
           }
         }
 
-        // Extract text safely using the pre element to preserve formatting
         const pre = codeBlock.querySelector("pre");
         const text = pre ? pre.textContent || "" : codeBlock.textContent || "";
-        
+
         setHoveredBlock({
           top: rect.top - containerRect.top + 8,
           right: containerRect.right - rect.right + 8,
           text,
           id: blockId,
           language,
-          selectEl
+          selectEl,
         });
       } else {
-        // Check if hovering the buttons themselves
-        if (!target.closest('.copy-overlay-btn') && !target.closest('.lang-overlay-btn')) {
+        if (!target.closest(".copy-overlay-btn") && !target.closest(".lang-overlay-btn")) {
           setHoveredBlock(null);
           setCopied(false);
         }
@@ -176,111 +235,190 @@ export default function NoteEditor({ initialContent, onChange, editable = true }
     };
 
     const el = containerRef.current;
-    if (el) el.addEventListener('mousemove', handleMouseMove);
+    if (el) el.addEventListener("mousemove", handleMouseMove);
     return () => {
-      if (el) el.removeEventListener('mousemove', handleMouseMove);
+      if (el) el.removeEventListener("mousemove", handleMouseMove);
     };
   }, []);
 
   return (
-    <div ref={containerRef} className="relative">
-      <BlockNoteView
-        editor={editor}
-        theme={resolvedTheme}
-        editable={editable}
-        onChange={() => {
-          onChange(editor.document);
-        }}
-      />
-      
-      {/* Absolute positioned overlay for language selector & copy button */}
-      {hoveredBlock && (
-        <div 
-          className="absolute z-10 flex items-center gap-1.5"
-          style={{ top: hoveredBlock.top, right: hoveredBlock.right }}
-        >
+    <div className="flex gap-4">
+      {/* Editor area */}
+      <div ref={containerRef} className="relative flex-1">
+        {/* ── Three-dots menu (top right) ── */}
+        <div className="absolute top-2 right-2 z-20">
           <button
-            className="lang-overlay-btn flex h-7 items-center justify-between gap-1.5 rounded-md border border-white/10 bg-black/40 px-2 text-[11px] font-medium text-white/70 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-sm"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowLangMenu(!showLangMenu);
-            }}
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-sm"
+            onClick={() => setShowMenu((v) => !v)}
+            title="More options"
           >
-            {LANGUAGES.find(l => l.value === hoveredBlock.language)?.label || "Plain Text"}
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="2" />
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="12" cy="19" r="2" />
+            </svg>
           </button>
-          
-          <button
-            className="copy-overlay-btn flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-sm"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              navigator.clipboard.writeText(hoveredBlock.text);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }}
-          >
-            {copied ? (
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 8.5l3 3 5-6" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.3"/></svg>
-            )}
-          </button>
-        </div>
-      )}
 
-      {/* Language Selection Dropdown Menu */}
-      {showLangMenu && hoveredBlock && (
-        <div 
-          className="lang-menu absolute z-50 rounded-xl border bg-[#1E1E1E]/95 backdrop-blur-xl p-1.5 shadow-2xl flex flex-col w-40"
-          style={{ top: hoveredBlock.top + 32, right: hoveredBlock.right, borderColor: "rgba(255,255,255,0.15)" }}
-        >
-          <input 
-            autoFocus
-            placeholder="Search language..."
-            className="bg-transparent border-b border-white/10 text-white text-[11px] px-2 py-1.5 outline-none mb-1 w-full placeholder:text-white/40"
-            value={searchLang}
-            onChange={(e) => setSearchLang(e.target.value)}
-          />
-          <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5" style={{ scrollbarWidth: 'thin' }}>
-            {LANGUAGES.filter(l => l.label.toLowerCase().includes(searchLang.toLowerCase())).map(lang => (
-              <button 
-                key={lang.value}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+          {showMenu && (
+            <div
+              className="absolute right-0 top-9 z-50 w-48 rounded-xl border border-white/10 bg-[#1E1E1E]/95 p-1 shadow-2xl backdrop-blur-xl"
+            >
+              <button
+                className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[12px] font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => {
+                  setShowToc((v) => !v);
+                  setShowMenu(false);
                 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
-                  if (hoveredBlock.id) {
-                    editor.updateBlock(hoveredBlock.id, { 
-                      type: "codeBlock",
-                      props: { language: lang.value } 
-                    });
-                  }
-                  
-                  setShowLangMenu(false);
-                  setSearchLang("");
-                  setHoveredBlock(prev => prev ? { ...prev, language: lang.value } : null);
-                }}
-                className="text-left text-[11px] font-medium text-white/70 hover:bg-white/10 hover:text-white px-2 py-1.5 rounded transition-colors"
               >
-                {lang.label}
+                <span>Table of contents</span>
+                {showToc && (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8.5l3 3 7-7" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </button>
-            ))}
-            {LANGUAGES.filter(l => l.label.toLowerCase().includes(searchLang.toLowerCase())).length === 0 && (
-              <div className="px-2 py-2 text-[10px] text-white/40 text-center">No results found</div>
+            </div>
+          )}
+        </div>
+
+        <BlockNoteView
+          editor={editor}
+          theme={resolvedTheme}
+          editable={editable}
+          onChange={() => {
+            const doc = editor.document;
+            setDocumentBlocks(doc);
+            onChange(doc);
+          }}
+        />
+
+        {/* ── Absolute positioned overlay for language selector & copy button ── */}
+        {hoveredBlock && (
+          <div
+            className="absolute z-10 flex items-center gap-1.5"
+            style={{ top: hoveredBlock.top, right: hoveredBlock.right }}
+          >
+            <button
+              className="lang-overlay-btn flex h-7 items-center justify-between gap-1.5 rounded-md border border-white/10 bg-black/40 px-2 text-[11px] font-medium text-white/70 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-sm"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowLangMenu(!showLangMenu);
+              }}
+            >
+              {LANGUAGES.find((l) => l.value === hoveredBlock.language)?.label || "Plain Text"}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            <button
+              className="copy-overlay-btn flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/70 hover:bg-black/60 hover:text-white transition-colors backdrop-blur-sm"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigator.clipboard.writeText(hoveredBlock.text);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              {copied ? (
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 8.5l3 3 5-6" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.3" />
+                </svg>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* ── Language Selection Dropdown Menu ── */}
+        {showLangMenu && hoveredBlock && (
+          <div
+            className="lang-menu absolute z-50 rounded-xl border bg-[#1E1E1E]/95 backdrop-blur-xl p-1.5 shadow-2xl flex flex-col w-40"
+            style={{ top: hoveredBlock.top + 32, right: hoveredBlock.right, borderColor: "rgba(255,255,255,0.15)" }}
+          >
+            <input
+              autoFocus
+              placeholder="Search language..."
+              className="bg-transparent border-b border-white/10 text-white text-[11px] px-2 py-1.5 outline-none mb-1 w-full placeholder:text-white/40"
+              value={searchLang}
+              onChange={(e) => setSearchLang(e.target.value)}
+            />
+            <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5" style={{ scrollbarWidth: "thin" }}>
+              {LANGUAGES.filter((l) => l.label.toLowerCase().includes(searchLang.toLowerCase())).map((lang) => (
+                <button
+                  key={lang.value}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (hoveredBlock.id) {
+                      editor.updateBlock(hoveredBlock.id, {
+                        type: "codeBlock",
+                        props: { language: lang.value },
+                      });
+                    }
+
+                    setShowLangMenu(false);
+                    setSearchLang("");
+                    setHoveredBlock((prev) => (prev ? { ...prev, language: lang.value } : null));
+                  }}
+                  className="text-left text-[11px] font-medium text-white/70 hover:bg-white/10 hover:text-white px-2 py-1.5 rounded transition-colors"
+                >
+                  {lang.label}
+                </button>
+              ))}
+              {LANGUAGES.filter((l) => l.label.toLowerCase().includes(searchLang.toLowerCase())).length === 0 && (
+                <div className="px-2 py-2 text-[10px] text-white/40 text-center">No results found</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Table of Contents sidebar ── */}
+      {showToc && (
+        <div className="w-56 shrink-0">
+          <div className="sticky top-4 rounded-xl border border-white/10 bg-[#1E1E1E]/80 p-3 backdrop-blur-xl">
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/50">
+              Table of contents
+            </h3>
+            {headings.length === 0 ? (
+              <p className="text-[11px] text-white/40">No headings yet</p>
+            ) : (
+              <nav className="flex flex-col gap-0.5">
+                {headings.map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => scrollToHeading(h.id)}
+                    className={`text-left rounded-md px-2 py-1 text-[11px] transition-colors ${
+                      activeHeadingId === h.id
+                        ? "bg-white/10 font-medium text-white"
+                        : "text-white/60 hover:bg-white/5 hover:text-white/90"
+                    }`}
+                    style={{ paddingLeft: `${0.5 + (h.level - 1) * 0.75}rem` }}
+                  >
+                    {h.text}
+                  </button>
+                ))}
+              </nav>
             )}
           </div>
         </div>
