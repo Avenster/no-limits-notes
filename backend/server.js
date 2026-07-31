@@ -12,6 +12,7 @@ const pageRoutes = require("./src/routes/page");
 const publicPageRoutes = require("./src/routes/publicPage");
 
 const app = express();
+app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL =
